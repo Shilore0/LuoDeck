@@ -18,6 +18,7 @@ public:
     void rebuildLayout();
     void scheduleRebuild();
     bool isPopupOpen() const;
+    void closePopup();
 
 signals:
     void requestHide();

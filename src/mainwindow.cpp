@@ -112,6 +112,8 @@ void MainWindow::showPanel()
 
 void MainWindow::hidePanel()
 {
+    if (m_canvas)
+        m_canvas->closePopup();
     hide();
 }
 

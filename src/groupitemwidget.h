@@ -25,6 +25,8 @@ public:
 signals:
     void openRequested(const QString &groupId);
     void childLaunchRequested(const QString &groupId, const QString &childId, const QString &path);
+    void childContextRequested(const QString &groupId, const QString &childId,
+                               const QString &path, const QPoint &globalPos);
 
 protected:
     void paintEvent(QPaintEvent *event) override;

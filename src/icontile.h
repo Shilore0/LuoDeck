@@ -22,6 +22,7 @@ signals:
     // 拖动过程中持续上报：起点 + 当前点，由父级（框）负责移动自身
     void dragMoved(const QPoint &startGlobal, const QPoint &currentGlobal);
     void dragEnded();
+    void contextRequested(const QPoint &globalPos);
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -30,6 +31,7 @@ protected:
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
+    void contextMenuEvent(QContextMenuEvent *event) override;
 
 private:
     QIcon m_icon;

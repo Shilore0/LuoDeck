@@ -75,6 +75,10 @@ void GroupItemWidget::rebuildTiles()
         connect(tile, &IconTile::clicked, this, [this, childId, childPath] {
             emit childLaunchRequested(m_item.id, childId, childPath);
         });
+        connect(tile, &IconTile::contextRequested, this,
+                [this, childId, childPath](const QPoint &globalPos) {
+                    emit childContextRequested(m_item.id, childId, childPath, globalPos);
+                });
         connect(tile, &IconTile::dragMoved, this,
                 [this](const QPoint &start, const QPoint &current) {
                     if (!m_externalDrag) {

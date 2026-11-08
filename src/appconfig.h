@@ -41,6 +41,7 @@ public:
     int iconSize() const { return m_iconSize; }
     QSize canvasSize() const { return m_canvas; }
     bool hideDesktopFrame() const { return m_hideDesktopFrame; }
+    QStringList hiddenPaths() const { return m_hiddenPaths; }
 
     void setLanguage(const QString &v);
     void setTheme(const QString &v);
@@ -49,6 +50,8 @@ public:
     void setPythonPath(const QString &v);
     void setIconSize(int v);
     void setHideDesktopFrame(bool v);
+    // 从面板移除某个路径，并记入忽略列表（桌面同步时不再加回来）
+    void hidePath(const QString &path);
 
     QVector<LayoutItem> &items() { return m_items; }
     const QVector<LayoutItem> &items() const { return m_items; }
@@ -111,5 +114,6 @@ private:
     int m_iconSize = 48;
     QSize m_canvas{720, 520};
     bool m_hideDesktopFrame = false;
+    QStringList m_hiddenPaths;
     QVector<LayoutItem> m_items;
 };

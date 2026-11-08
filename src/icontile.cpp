@@ -3,6 +3,7 @@
 #include "metrics.h"
 #include "theme.h"
 
+#include <QContextMenuEvent>
 #include <QMouseEvent>
 #include <QPainter>
 
@@ -155,5 +156,11 @@ void IconTile::mouseReleaseEvent(QMouseEvent *event)
         emit dragEnded();
     else
         emit clicked();
+    event->accept();
+}
+
+void IconTile::contextMenuEvent(QContextMenuEvent *event)
+{
+    emit contextRequested(event->globalPos());
     event->accept();
 }

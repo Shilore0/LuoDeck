@@ -27,7 +27,7 @@ GroupPopup::GroupPopup(const LayoutItem &group, QWidget *parent)
     buildTiles();
 
     m_allowAutoClose = false;
-    QTimer::singleShot(220, this, [this] { m_allowAutoClose = true; });
+    QTimer::singleShot(400, this, [this] { m_allowAutoClose = true; });
 }
 
 void GroupPopup::buildTiles()

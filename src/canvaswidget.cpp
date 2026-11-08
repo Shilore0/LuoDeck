@@ -51,6 +51,14 @@ bool CanvasWidget::isPopupOpen() const
     return m_popup != nullptr && m_popup->isVisible();
 }
 
+void CanvasWidget::closePopup()
+{
+    if (!m_popup)
+        return;
+    m_popup->close();
+    m_popup = nullptr;
+}
+
 void CanvasWidget::scheduleRebuild()
 {
     if (m_rebuildPending)
@@ -127,6 +135,28 @@ void CanvasWidget::addGroupWidget(const LayoutItem &item)
                 emit requestHide();
                 if (!Launcher::run(path))
                     emit launchFailed(path);
+            });
+
+    connect(w, &GroupItemWidget::childContextRequested, this,
+            [this](const QString &groupId, const QString &childId, const QString &path,
+                   const QPoint &globalPos) {
+                const LayoutItem *group = AppConfig::instance().findById(groupId);
+                const bool systemFrame = group && group->system;
+
+                QMenu menu(this);
+                menu.addAction(I18n::instance().t("item.reveal"), this, [path] {
+                    Launcher::revealInExplorer(path);
+                });
+                menu.addSeparator();
+                menu.addAction(systemFrame ? I18n::instance().t("item.hide_desktop")
+                                           : I18n::instance().t("item.remove"),
+                               this, [systemFrame, childId, path] {
+                                   if (systemFrame)
+                                       AppConfig::instance().hidePath(path);
+                                   else
+                                       AppConfig::instance().removeItem(childId);
+                               });
+                menu.exec(globalPos);
             });
 }
 
@@ -266,7 +296,7 @@ void CanvasWidget::openGroupPopup(const QString &id, const QPoint &globalPos)
         m_popup = nullptr;
     }
 
-    auto *popup = new GroupPopup(*item, this);
+    auto *popup = new GroupPopup(*item, nullptr); // 独立顶层窗口，主面板隐藏时不受牵连
     m_popup = popup;
 
     connect(popup, &GroupPopup::childLaunchRequested, this, [this](const QString &path) {

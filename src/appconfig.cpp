@@ -233,6 +233,11 @@ bool AppConfig::load()
     m_iconSize = qBound(24, root.value("iconSize").toInt(48), 128);
     m_hideDesktopFrame = root.value("hideDesktopFrame").toBool(false);
 
+    m_hiddenPaths.clear();
+    const QJsonArray hidden = root.value("hiddenPaths").toArray();
+    for (const QJsonValue &v : hidden)
+        m_hiddenPaths.append(v.toString());
+
     const QJsonObject canvas = root.value("canvas").toObject();
     m_canvas = QSize(qBound(480, canvas.value("width").toInt(720), 2400),
                      qBound(360, canvas.value("height").toInt(520), 1600));
@@ -272,6 +277,11 @@ bool AppConfig::save()
     root.insert("iconSize", m_iconSize);
     root.insert("hideDesktopFrame", m_hideDesktopFrame);
 
+    QJsonArray hiddenArr;
+    for (const QString &p : m_hiddenPaths)
+        hiddenArr.append(p);
+    root.insert("hiddenPaths", hiddenArr);
+
     QJsonObject canvas;
     canvas.insert("width", m_canvas.width());
     canvas.insert("height", m_canvas.height());
@@ -299,6 +309,7 @@ void AppConfig::applyDefaults()
     m_iconSize = 48;
     m_canvas = QSize(720, 520);
     m_hideDesktopFrame = false;
+    m_hiddenPaths.clear();
     m_items.clear();
 }
 
@@ -391,6 +402,8 @@ void AppConfig::syncDesktopFrame()
     for (const QString &path : onDisk) {
         if (keptPaths.contains(path))
             continue;
+        if (m_hiddenPaths.contains(path)) // 用户主动隐藏过，不要再加回来
+            continue;
         LayoutItem child;
         child.id = makeId();
         child.type = "app";
@@ -451,6 +464,9 @@ QString AppConfig::addApp(const QString &path, const QString &groupId)
         return QString();
 
     const QString normalized = QDir::fromNativeSeparators(fi.absoluteFilePath());
+
+    // 用户重新添加时，解除此前的隐藏
+    m_hiddenPaths.removeAll(normalized);
 
     LayoutItem item;
     item.id = makeId();
@@ -648,6 +664,30 @@ void AppConfig::setIconSize(int v)
         return;
     m_iconSize = clamped;
     save();
+    emit changed();
+}
+
+void AppConfig::hidePath(const QString &path)
+{
+    const QString normalized = QDir::fromNativeSeparators(path);
+
+    if (!m_hiddenPaths.contains(normalized))
+        m_hiddenPaths.append(normalized);
+
+    for (LayoutItem &group : m_items) {
+        for (int i = group.children.size() - 1; i >= 0; --i) {
+            if (group.children.at(i).path.compare(normalized, Qt::CaseInsensitive) == 0)
+                group.children.removeAt(i);
+        }
+    }
+    for (int i = m_items.size() - 1; i >= 0; --i) {
+        if (!m_items.at(i).isGroup()
+            && m_items.at(i).path.compare(normalized, Qt::CaseInsensitive) == 0)
+            m_items.removeAt(i);
+    }
+
+    save();
+    emit layoutChanged();
     emit changed();
 }
 

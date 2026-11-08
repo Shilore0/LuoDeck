@@ -44,28 +44,21 @@ bool startSilent(const QString &program, const QStringList &arguments, const QSt
     return proc.startDetached();
 }
 
-// 找可用的无窗口 Python：设置里指定的优先，其次 PATH 里的 pyw / pythonw
-// 注意：Windows 的「应用执行别名」会在 WindowsApps 下放 0 字节空壳，
-// 直接运行只会弹应用商店，必须跳过
+// 找可用的 Python：设置里指定的优先，其次 PATH 里的 pythonw / pyw / python
+// 注意：Store 版 Python 在 WindowsApps 下也是 0 字节别名（真身在 Program Files\WindowsApps），
+// 所以不能按文件大小过滤，别名本身可以正常启动
 QString resolvePython()
 {
     const QString configured = AppConfig::instance().pythonPath();
-    if (!configured.isEmpty()) {
-        const QFileInfo fi(configured);
-        if (fi.exists() && fi.size() > 4096)
-            return configured;
-    }
+    if (!configured.isEmpty() && QFile::exists(configured))
+        return configured;
 
-    const QStringList candidates = {QStringLiteral("pyw.exe"), QStringLiteral("pythonw.exe"),
+    const QStringList candidates = {QStringLiteral("pythonw.exe"), QStringLiteral("pyw.exe"),
                                     QStringLiteral("python.exe")};
     for (const QString &name : candidates) {
         const QString found = QStandardPaths::findExecutable(name);
-        if (found.isEmpty())
-            continue;
-        const QFileInfo fi(found);
-        if (fi.size() <= 4096) // Store 别名占位符，跳过
-            continue;
-        return found;
+        if (!found.isEmpty())
+            return found;
     }
     return QString();
 }
