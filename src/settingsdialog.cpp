@@ -10,6 +10,8 @@
 #include <QComboBox>
 #include <QDesktopServices>
 #include <QDialogButtonBox>
+#include <QDir>
+#include <QFileDialog>
 #include <QFormLayout>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -60,7 +62,36 @@ SettingsDialog::SettingsDialog(QWidget *parent)
     m_hotkey->setPlaceholderText(QStringLiteral("ctrl+space"));
     form->addRow(I18n::instance().t("settings.hotkey"), m_hotkey);
 
+    m_hotkeyAdd = new QLineEdit(cfg.hotkeyAdd(), this);
+    m_hotkeyAdd->setPlaceholderText(QStringLiteral("ctrl+alt+l"));
+    form->addRow(I18n::instance().t("settings.add_hotkey"), m_hotkeyAdd);
+
+    auto *pyHost = new QWidget(this);
+    auto *pyRow = new QHBoxLayout(pyHost);
+    pyRow->setContentsMargins(0, 0, 0, 0);
+    pyRow->setSpacing(6);
+    m_python = new QLineEdit(cfg.pythonPath(), pyHost);
+    m_python->setPlaceholderText(I18n::instance().t("settings.python_auto"));
+    pyRow->addWidget(m_python, 1);
+    auto *browse = new QPushButton(I18n::instance().t("settings.browse"), pyHost);
+    browse->setFixedWidth(64);
+    connect(browse, &QPushButton::clicked, this, [this] {
+        const QString file = QFileDialog::getOpenFileName(
+            this, I18n::instance().t("settings.python"), QString(),
+            QStringLiteral("pythonw.exe (*.exe);;所有文件 (*.*)"));
+        if (!file.isEmpty())
+            m_python->setText(QDir::toNativeSeparators(file));
+    });
+    pyRow->addWidget(browse);
+    form->addRow(I18n::instance().t("settings.python"), pyHost);
+
     root->addLayout(form);
+
+    auto *pyNote = new QLabel(I18n::instance().t("settings.python_note"), this);
+    pyNote->setWordWrap(true);
+    pyNote->setStyleSheet(QString("color: %1; font-size: 12px;")
+                              .arg(Theme::instance().color("textMuted").name(QColor::HexRgb)));
+    root->addWidget(pyNote);
 
     auto *note = new QLabel(I18n::instance().t("settings.hotkey_note"), this);
     note->setWordWrap(true);
@@ -150,6 +181,17 @@ void SettingsDialog::applyAndClose()
         cfg.setHotkey(hotkey);
         hotkeyDirty = true;
     }
+
+    if (m_hotkeyAdd) {
+        const QString addKey = m_hotkeyAdd->text().trimmed();
+        if (!addKey.isEmpty() && addKey.compare(cfg.hotkeyAdd(), Qt::CaseInsensitive) != 0) {
+            cfg.setHotkeyAdd(addKey);
+            hotkeyDirty = true;
+        }
+    }
+
+    if (m_python && m_python->text().trimmed() != cfg.pythonPath())
+        cfg.setPythonPath(m_python->text().trimmed());
 
     if (hotkeyDirty)
         emit hotkeyChanged();

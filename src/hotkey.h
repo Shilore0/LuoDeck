@@ -10,7 +10,7 @@ class Hotkey : public QObject, public QAbstractNativeEventFilter
 {
     Q_OBJECT
 public:
-    explicit Hotkey(QObject *parent = nullptr);
+    explicit Hotkey(int id = 0xB00D, QObject *parent = nullptr);
     ~Hotkey() override;
 
     bool registerFromString(const QString &spec);

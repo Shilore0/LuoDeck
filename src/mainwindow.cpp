@@ -6,12 +6,14 @@
 #include "i18n.h"
 #include "iconprovider.h"
 #include "settingsdialog.h"
+#include "shellselection.h"
 #include "theme.h"
 #include "windowfx.h"
 
 #include <QApplication>
 #include <QCursor>
 #include <QDesktopServices>
+#include <QFileInfo>
 #include <QGuiApplication>
 #include <QKeyEvent>
 #include <QMenu>
@@ -38,6 +40,11 @@ MainWindow::MainWindow(QWidget *parent)
     layout->addWidget(m_canvas);
 
     connect(m_canvas, &CanvasWidget::requestHide, this, &MainWindow::hidePanel);
+    connect(m_canvas, &CanvasWidget::launchFailed, this, [this](const QString &path) {
+        notify(QStringLiteral("LuoDeck"),
+               I18n::instance().t(QStringLiteral("launch.failed"),
+                                  QFileInfo(path).fileName()));
+    });
     connect(&Theme::instance(), &Theme::themeChanged, this, &MainWindow::applyTheme);
     connect(&I18n::instance(), &I18n::languageChanged, this, &MainWindow::retranslateUi);
 
@@ -174,8 +181,12 @@ void MainWindow::openSettings()
 void MainWindow::setupHotkey()
 {
     if (!m_hotkey) {
-        m_hotkey = new Hotkey(this);
+        m_hotkey = new Hotkey(0xB00D, this);
         connect(m_hotkey, &Hotkey::activated, this, &MainWindow::toggleVisible);
+    }
+    if (!m_hotkeyAdd) {
+        m_hotkeyAdd = new Hotkey(0xB00E, this);
+        connect(m_hotkeyAdd, &Hotkey::activated, this, &MainWindow::addCurrentSelection);
     }
     reregisterHotkey();
 }
@@ -186,21 +197,48 @@ void MainWindow::reregisterHotkey()
         return;
 
     AppConfig &cfg = AppConfig::instance();
+
+    // 面板热键
     const QString wanted = cfg.hotkey();
+    if (!m_hotkey->registerFromString(wanted)) {
+        if (wanted.compare(QStringLiteral("ctrl+space"), Qt::CaseInsensitive) == 0
+            && m_hotkey->registerFromString(QStringLiteral("ctrl+alt+space"))) {
+            notify(QStringLiteral("LuoDeck"),
+                   QStringLiteral("Ctrl+Space 已被其他程序（通常是输入法）占用，"
+                                  "临时改用 Ctrl+Alt+Space。可在托盘 → 设置 中修改。"));
+        } else {
+            notify(QStringLiteral("LuoDeck"),
+                   I18n::instance().t(QStringLiteral("tray.hotkey_failed"), wanted));
+        }
+    }
 
-    if (m_hotkey->registerFromString(wanted))
-        return;
+    // 「把选中项加入面板」热键
+    if (m_hotkeyAdd) {
+        const QString addKey = cfg.hotkeyAdd();
+        if (!addKey.isEmpty() && !m_hotkeyAdd->registerFromString(addKey)) {
+            notify(QStringLiteral("LuoDeck"),
+                   I18n::instance().t(QStringLiteral("hotkey.add_failed"), addKey));
+        }
+    }
+}
 
-    if (wanted.compare(QStringLiteral("ctrl+space"), Qt::CaseInsensitive) == 0
-        && m_hotkey->registerFromString(QStringLiteral("ctrl+alt+space"))) {
-        notify(QStringLiteral("LuoDeck"),
-               QStringLiteral("Ctrl+Space 已被其他程序（通常是输入法）占用，临时改用 Ctrl+Alt+Space。\n"
-                              "可在托盘 → 设置 中修改热键。"));
+void MainWindow::addCurrentSelection()
+{
+    const QStringList paths = ShellSelection::currentSelection();
+    if (paths.isEmpty()) {
+        notify(QStringLiteral("LuoDeck"), I18n::instance().t(QStringLiteral("hotkey.no_selection")));
         return;
     }
 
-    notify(QStringLiteral("LuoDeck"),
-           I18n::instance().t(QStringLiteral("tray.hotkey_failed"), wanted));
+    int added = 0;
+    for (const QString &path : paths) {
+        if (!AppConfig::instance().addApp(path).isEmpty())
+            ++added;
+    }
+
+    notify(QStringLiteral("LuoDeck"), I18n::instance().t(QStringLiteral("hotkey.added")).arg(added));
+    if (!isVisible())
+        showPanel();
 }
 
 void MainWindow::rebuildTrayMenu()

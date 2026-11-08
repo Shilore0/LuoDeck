@@ -3,7 +3,9 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
+#include <QProcess>
 #include <QSettings>
+#include <QTimer>
 
 namespace {
 

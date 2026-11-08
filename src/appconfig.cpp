@@ -228,6 +228,8 @@ bool AppConfig::load()
     m_language = root.value("language").toString("zh_CN");
     m_theme = root.value("theme").toString("default");
     m_hotkey = root.value("hotkey").toString("ctrl+space");
+    m_hotkeyAdd = root.value("hotkeyAdd").toString("ctrl+alt+l");
+    m_pythonPath = root.value("pythonPath").toString();
     m_iconSize = qBound(24, root.value("iconSize").toInt(48), 128);
     m_hideDesktopFrame = root.value("hideDesktopFrame").toBool(false);
 
@@ -265,6 +267,8 @@ bool AppConfig::save()
     root.insert("language", m_language);
     root.insert("theme", m_theme);
     root.insert("hotkey", m_hotkey);
+    root.insert("hotkeyAdd", m_hotkeyAdd);
+    root.insert("pythonPath", m_pythonPath);
     root.insert("iconSize", m_iconSize);
     root.insert("hideDesktopFrame", m_hideDesktopFrame);
 
@@ -290,6 +294,8 @@ void AppConfig::applyDefaults()
     m_language = "zh_CN";
     m_theme = "default";
     m_hotkey = "ctrl+space";
+    m_hotkeyAdd = "ctrl+alt+l";
+    m_pythonPath.clear();
     m_iconSize = 48;
     m_canvas = QSize(720, 520);
     m_hideDesktopFrame = false;
@@ -613,6 +619,24 @@ void AppConfig::setHotkey(const QString &v)
     if (m_hotkey == v)
         return;
     m_hotkey = v;
+    save();
+    emit changed();
+}
+
+void AppConfig::setHotkeyAdd(const QString &v)
+{
+    if (m_hotkeyAdd == v)
+        return;
+    m_hotkeyAdd = v;
+    save();
+    emit changed();
+}
+
+void AppConfig::setPythonPath(const QString &v)
+{
+    if (m_pythonPath == v)
+        return;
+    m_pythonPath = v;
     save();
     emit changed();
 }

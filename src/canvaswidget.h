@@ -21,6 +21,7 @@ public:
 
 signals:
     void requestHide();
+    void launchFailed(const QString &path);
 
 protected:
     void paintEvent(QPaintEvent *event) override;

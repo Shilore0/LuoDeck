@@ -25,5 +25,7 @@ private:
     QComboBox *m_theme = nullptr;
     QComboBox *m_language = nullptr;
     QLineEdit *m_hotkey = nullptr;
+    QLineEdit *m_hotkeyAdd = nullptr;
+    QLineEdit *m_python = nullptr;
     QCheckBox *m_hideDesktop = nullptr;
 };

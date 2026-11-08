@@ -36,6 +36,8 @@ public:
     QString language() const { return m_language; }
     QString theme() const { return m_theme; }
     QString hotkey() const { return m_hotkey; }
+    QString hotkeyAdd() const { return m_hotkeyAdd; }
+    QString pythonPath() const { return m_pythonPath; }
     int iconSize() const { return m_iconSize; }
     QSize canvasSize() const { return m_canvas; }
     bool hideDesktopFrame() const { return m_hideDesktopFrame; }
@@ -43,6 +45,8 @@ public:
     void setLanguage(const QString &v);
     void setTheme(const QString &v);
     void setHotkey(const QString &v);
+    void setHotkeyAdd(const QString &v);
+    void setPythonPath(const QString &v);
     void setIconSize(int v);
     void setHideDesktopFrame(bool v);
 
@@ -102,6 +106,8 @@ private:
     QString m_language = "zh_CN";
     QString m_theme = "default";
     QString m_hotkey = "ctrl+space";
+    QString m_hotkeyAdd = "ctrl+alt+l";
+    QString m_pythonPath;
     int m_iconSize = 48;
     QSize m_canvas{720, 520};
     bool m_hideDesktopFrame = false;

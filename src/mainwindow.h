@@ -28,6 +28,7 @@ public slots:
     void applyTheme();
     void openSettings();
     void reregisterHotkey();
+    void addCurrentSelection();
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -43,5 +44,6 @@ private:
     QSystemTrayIcon *m_tray = nullptr;
     QMenu *m_trayMenu = nullptr;
     Hotkey *m_hotkey = nullptr;
+    Hotkey *m_hotkeyAdd = nullptr;
     bool m_allowAutoHide = true;
 };

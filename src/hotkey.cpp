@@ -96,8 +96,9 @@ quint32 parseKey(const QString &raw)
 
 } // namespace
 
-Hotkey::Hotkey(QObject *parent)
+Hotkey::Hotkey(int id, QObject *parent)
     : QObject(parent)
+    , m_id(id)
 {
 #ifdef Q_OS_WIN
     // 隐藏宿主窗口：RegisterHotKey 需要一个真实 HWND，隐藏的窗口同样能收到 WM_HOTKEY

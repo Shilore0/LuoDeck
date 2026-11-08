@@ -125,7 +125,8 @@ void CanvasWidget::addGroupWidget(const LayoutItem &item)
     connect(w, &GroupItemWidget::childLaunchRequested, this,
             [this](const QString &, const QString &, const QString &path) {
                 emit requestHide();
-                Launcher::run(path);
+                if (!Launcher::run(path))
+                    emit launchFailed(path);
             });
 }
 
@@ -143,7 +144,8 @@ void CanvasWidget::handleActivated(const QString &id)
     }
 
     emit requestHide();
-    Launcher::run(item->path);
+    if (!Launcher::run(item->path))
+        emit launchFailed(item->path);
 }
 
 void CanvasWidget::handleDragFinished(const QString &id, const QPoint &pos)
@@ -269,7 +271,8 @@ void CanvasWidget::openGroupPopup(const QString &id, const QPoint &globalPos)
 
     connect(popup, &GroupPopup::childLaunchRequested, this, [this](const QString &path) {
         emit requestHide();
-        Launcher::run(path);
+        if (!Launcher::run(path))
+            emit launchFailed(path);
     });
     connect(popup, &QObject::destroyed, this, [this] { m_popup = nullptr; });
 
