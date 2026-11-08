@@ -17,6 +17,7 @@ constexpr int kGroupIconTop = 4;
 // 分组框内边距与配色
 constexpr int kGroupPad = 9;
 constexpr int kGroupRadius = 12;
+constexpr int kGroupTitleH = 18; // 框顶部标题条高度
 
 // 拖动阈值：小于此距离视为点击
 constexpr int kDragThreshold = 4;

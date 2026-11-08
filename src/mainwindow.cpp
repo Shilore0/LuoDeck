@@ -125,6 +125,8 @@ void MainWindow::reload()
 void MainWindow::retranslateUi()
 {
     rebuildTrayMenu();
+    if (m_canvas)
+        m_canvas->rebuildLayout();
     update();
 }
 

@@ -32,5 +32,6 @@ private:
     void relayoutTiles();
 
     LayoutItem m_item;
+    QString m_title;
     QVector<IconTile *> m_tiles;
 };

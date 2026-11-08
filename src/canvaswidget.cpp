@@ -1,6 +1,7 @@
 #include "canvaswidget.h"
 
 #include "appitemwidget.h"
+#include "foldersettingsdialog.h"
 #include "grouppopup.h"
 #include "groupitemwidget.h"
 #include "i18n.h"
@@ -61,6 +62,8 @@ void CanvasWidget::rebuildLayout()
 
     AppConfig &cfg = AppConfig::instance();
     for (const LayoutItem &item : cfg.items()) {
+        if (item.isGroup() && item.system && cfg.hideDesktopFrame())
+            continue;
         if (item.isGroup())
             addGroupWidget(item);
         else
@@ -137,6 +140,12 @@ void CanvasWidget::handleContext(const QString &id, const QPoint &globalPos)
 
 void CanvasWidget::showGroupMenu(const QString &id, const QPoint &globalPos)
 {
+    const LayoutItem *item = AppConfig::instance().findById(id);
+    if (!item)
+        return;
+
+    const bool isSystem = item->system;
+
     QMenu menu(this);
     menu.addAction(I18n::instance().t("group.open"), this, [this, id] {
         const auto *w = m_groupWidgets.value(id);
@@ -144,17 +153,23 @@ void CanvasWidget::showGroupMenu(const QString &id, const QPoint &globalPos)
         openGroupPopup(id, anchor);
     });
 
-    menu.addAction(I18n::instance().t("group.rename"), this, [this, id] {
-        const LayoutItem *item = AppConfig::instance().findById(id);
-        if (!item)
+    menu.addAction(I18n::instance().t("group.settings"), this, [this, id] {
+        const LayoutItem *target = AppConfig::instance().findById(id);
+        if (!target)
             return;
-        bool ok = false;
-        const QString name = QInputDialog::getText(this,
-                                                   I18n::instance().t("group.rename"),
-                                                   I18n::instance().t("group.rename_prompt"),
-                                                   QLineEdit::Normal, item->name, &ok);
-        if (ok && !name.trimmed().isEmpty())
-            AppConfig::instance().renameGroup(id, name.trimmed());
+
+        FolderSettingsDialog dlg(*target, this);
+        if (dlg.exec() != QDialog::Accepted)
+            return;
+        if (target->system)
+            return;
+
+        AppConfig &cfg = AppConfig::instance();
+        const QString newColor = dlg.folderColor();
+        const QString newName = dlg.folderName();
+        if (!newName.isEmpty())
+            cfg.renameGroup(id, newName);
+        cfg.setGroupColor(id, newColor);
     });
 
     QMenu *sizeMenu = menu.addMenu(I18n::instance().t("group.capacity"));
@@ -168,9 +183,10 @@ void CanvasWidget::showGroupMenu(const QString &id, const QPoint &globalPos)
     }
 
     menu.addSeparator();
-    menu.addAction(I18n::instance().t("group.delete"), this, [this, id] {
+    QAction *del = menu.addAction(I18n::instance().t("group.delete"), this, [this, id] {
         AppConfig::instance().removeItem(id);
     });
+    del->setEnabled(!isSystem);
 
     menu.exec(globalPos);
 }

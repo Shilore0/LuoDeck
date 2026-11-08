@@ -11,6 +11,7 @@
 GroupItemWidget::GroupItemWidget(const LayoutItem &item, QWidget *parent)
     : ItemWidget(item.id, parent)
     , m_item(item)
+    , m_title(item.system ? I18n::instance().t("group.desktop") : item.name)
 {
     setFixedSize(computeSize());
     rebuildTiles();
@@ -19,13 +20,15 @@ GroupItemWidget::GroupItemWidget(const LayoutItem &item, QWidget *parent)
 QSize GroupItemWidget::computeSize() const
 {
     const int w = m_item.cols * (Metrics::kGroupCellW + 2) + 2 * Metrics::kGroupPad;
-    const int h = m_item.rows * (Metrics::kGroupCellH + 2) + 2 * Metrics::kGroupPad;
+    const int h = m_item.rows * (Metrics::kGroupCellH + 2) + 2 * Metrics::kGroupPad
+        + Metrics::kGroupTitleH;
     return QSize(w, h);
 }
 
 void GroupItemWidget::setLayoutItem(const LayoutItem &item)
 {
     m_item = item;
+    m_title = item.system ? I18n::instance().t("group.desktop") : item.name;
 }
 
 void GroupItemWidget::relayoutTiles()
@@ -35,7 +38,8 @@ void GroupItemWidget::relayoutTiles()
         const int r = i / cols;
         const int c = i % cols;
         m_tiles.at(i)->move(Metrics::kGroupPad + c * (Metrics::kGroupCellW + 2),
-                            Metrics::kGroupPad + r * (Metrics::kGroupCellH + 2));
+                            Metrics::kGroupPad + Metrics::kGroupTitleH
+                                + r * (Metrics::kGroupCellH + 2));
     }
 }
 
@@ -82,12 +86,6 @@ void GroupItemWidget::rebuildTiles()
         });
         tile->show();
         m_tiles.append(tile);
-
-        // 溢出按钮固定占最后一个格子，视觉上跟随网格位置
-        const int lastRow = (cap - 1) / qMax(1, m_item.cols);
-        const int lastCol = (cap - 1) % qMax(1, m_item.cols);
-        tile->move(Metrics::kGroupPad + lastCol * (Metrics::kGroupCellW + 2),
-                   Metrics::kGroupPad + lastRow * (Metrics::kGroupCellH + 2));
     }
 
     relayoutTiles();
@@ -101,12 +99,30 @@ void GroupItemWidget::paintEvent(QPaintEvent *event)
     p.setRenderHint(QPainter::Antialiasing, true);
 
     const Theme &th = Theme::instance();
-    QColor bg = th.color("surface");
-    bg.setAlpha(150);
-    QColor border = th.color("border");
-    border.setAlpha(150);
 
-    p.setPen(QPen(border, 1));
-    p.setBrush(bg);
-    p.drawRoundedRect(rect().adjusted(0, 0, -1, -1), Metrics::kGroupRadius, Metrics::kGroupRadius);
+    QColor accent(m_item.color);
+    if (!accent.isValid())
+        accent = th.color("accent");
+
+    QColor fill = accent;
+    fill.setAlpha(26);
+
+    p.setPen(QPen(accent, 1.4));
+    p.setBrush(fill);
+    p.drawRoundedRect(rect().adjusted(0, 0, -1, -1), Metrics::kGroupRadius,
+                      Metrics::kGroupRadius);
+
+    // 顶部标题条：显示文件夹名字
+    QFont f = font();
+    f.setPixelSize(11);
+    f.setBold(true);
+    p.setFont(f);
+    p.setPen(th.color("text"));
+
+    const QRect titleRect(Metrics::kGroupPad + 1, 2,
+                          width() - 2 * Metrics::kGroupPad - 2,
+                          Metrics::kGroupTitleH - 3);
+    const QFontMetrics fm(f);
+    p.drawText(titleRect, Qt::AlignLeft | Qt::AlignVCenter,
+               fm.elidedText(m_title, Qt::ElideRight, titleRect.width()));
 }

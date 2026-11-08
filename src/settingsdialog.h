@@ -4,6 +4,7 @@
 
 class QComboBox;
 class QLineEdit;
+class QCheckBox;
 
 class SettingsDialog : public QDialog
 {
@@ -21,4 +22,5 @@ private:
     QComboBox *m_theme = nullptr;
     QComboBox *m_language = nullptr;
     QLineEdit *m_hotkey = nullptr;
+    QCheckBox *m_hideDesktop = nullptr;
 };

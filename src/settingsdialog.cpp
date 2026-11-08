@@ -4,6 +4,7 @@
 #include "i18n.h"
 #include "theme.h"
 
+#include <QCheckBox>
 #include <QComboBox>
 #include <QDesktopServices>
 #include <QDialogButtonBox>
@@ -66,6 +67,22 @@ SettingsDialog::SettingsDialog(QWidget *parent)
     row->addStretch(1);
     root->addLayout(row);
 
+    auto *hideBox = new QVBoxLayout;
+    hideBox->setContentsMargins(0, 2, 0, 0);
+    hideBox->setSpacing(2);
+
+    m_hideDesktop = new QCheckBox(I18n::instance().t("settings.hide_desktop"), this);
+    m_hideDesktop->setChecked(cfg.hideDesktopFrame());
+    hideBox->addWidget(m_hideDesktop);
+
+    auto *hideNote = new QLabel(I18n::instance().t("settings.hide_desktop_note"), this);
+    hideNote->setWordWrap(true);
+    hideNote->setStyleSheet(QString("color: %1; font-size: 12px;")
+                                .arg(Theme::instance().color("textMuted").name(QColor::HexRgb)));
+    hideBox->addWidget(hideNote);
+
+    root->addLayout(hideBox);
+
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
     buttons->button(QDialogButtonBox::Ok)->setText(I18n::instance().t("settings.ok"));
     buttons->button(QDialogButtonBox::Cancel)->setText(I18n::instance().t("settings.cancel"));
@@ -101,6 +118,9 @@ void SettingsDialog::applyAndClose()
 
     if (hotkeyDirty)
         emit hotkeyChanged();
+
+    if (m_hideDesktop && m_hideDesktop->isChecked() != cfg.hideDesktopFrame())
+        cfg.setHideDesktopFrame(m_hideDesktop->isChecked());
 
     accept();
 }

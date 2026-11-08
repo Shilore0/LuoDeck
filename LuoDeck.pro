@@ -16,6 +16,7 @@ SOURCES += \
     src/grouppopup.cpp \
     src/icontile.cpp \
     src/settingsdialog.cpp \
+    src/foldersettingsdialog.cpp \
     src/iconprovider.cpp \
     src/launcher.cpp \
     src/appconfig.cpp \
@@ -32,6 +33,7 @@ HEADERS += \
     src/grouppopup.h \
     src/icontile.h \
     src/settingsdialog.h \
+    src/foldersettingsdialog.h \
     src/iconprovider.h \
     src/launcher.h \
     src/appconfig.h \

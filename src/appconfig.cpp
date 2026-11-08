@@ -1,5 +1,7 @@
 #include "appconfig.h"
 
+#include "metrics.h"
+
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
@@ -7,6 +9,8 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QRandomGenerator>
+#include <QRect>
 #include <QSaveFile>
 #include <QSet>
 #include <QStandardPaths>
@@ -22,10 +26,14 @@ QJsonObject itemToJson(const LayoutItem &it)
     o.insert("name", it.name);
     o.insert("x", it.x);
     o.insert("y", it.y);
+    if (it.system)
+        o.insert("system", true);
 
     if (it.isGroup()) {
         o.insert("cols", it.cols);
         o.insert("rows", it.rows);
+        if (!it.color.isEmpty())
+            o.insert("color", it.color);
         QJsonArray kids;
         for (const LayoutItem &c : it.children)
             kids.append(itemToJson(c));
@@ -44,6 +52,8 @@ LayoutItem itemFromJson(const QJsonObject &o)
         it.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
     it.type = o.value("type").toString("app");
     it.name = o.value("name").toString();
+    it.color = o.value("color").toString();
+    it.system = o.value("system").toBool(false);
     it.x = o.value("x").toInt(0);
     it.y = o.value("y").toInt(0);
     it.path = o.value("path").toString();
@@ -109,6 +119,26 @@ bool AppConfig::isFolderPath(const QString &path)
     return QFileInfo(path).isDir();
 }
 
+QStringList AppConfig::palette()
+{
+    return {QStringLiteral("#F2B33D"), QStringLiteral("#4A90D9"), QStringLiteral("#4CAF7D"),
+            QStringLiteral("#E86A92"), QStringLiteral("#9B7EDE"), QStringLiteral("#F08A4B"),
+            QStringLiteral("#48B8C4")};
+}
+
+QString AppConfig::defaultDesktopColor()
+{
+    return QStringLiteral("#F2B33D");
+}
+
+QString AppConfig::randomPaletteColor()
+{
+    const QStringList colors = palette();
+    if (colors.isEmpty())
+        return defaultDesktopColor();
+    return colors.at(QRandomGenerator::global()->bounded(colors.size()));
+}
+
 void AppConfig::ensureDirectories()
 {
     QDir().mkpath(m_dataDir);
@@ -136,19 +166,9 @@ void AppConfig::mirrorShortcut(const QString &groupName, const QString &sourcePa
         return;
 
     const QString dirPath = groupDirFor(groupName);
-    QString base = displayNameFor(sourcePath);
-    QString target = dirPath + "/" + base + ".lnk";
-
-    int n = 2;
-    while (QFile::exists(target)) {
-        const QString candidate = dirPath + "/" + base + " (" + QString::number(n) + ").lnk";
-        if (QFileInfo(candidate).canonicalFilePath() == src.canonicalFilePath())
-            return;
-        target = candidate;
-        ++n;
-        if (n > 99)
-            return;
-    }
+    const QString target = dirPath + "/" + displayNameFor(sourcePath) + ".lnk";
+    if (QFile::exists(target))
+        return;
 
     // Windows 上 QFile::link 会创建真正的 .lnk 快捷方式
     QFile::link(src.absoluteFilePath(), target);
@@ -170,9 +190,7 @@ void AppConfig::renameGroupDir(const QString &oldName, const QString &newName)
     const QString to = groupDirFor(newName);
     if (from == to)
         return;
-    if (!QDir(from).exists())
-        return;
-    if (QDir(to).exists())
+    if (!QDir(from).exists() || QDir(to).exists())
         return;
     QDir().rename(from, to);
 }
@@ -187,7 +205,8 @@ bool AppConfig::load()
     QFile f(m_configPath);
     if (!f.exists() || !f.open(QIODevice::ReadOnly)) {
         applyDefaults();
-        seedFromDesktop();
+        ensureDesktopFrame();
+        syncDesktopFrame();
         save();
         return true;
     }
@@ -199,7 +218,8 @@ bool AppConfig::load()
     const QJsonDocument doc = QJsonDocument::fromJson(raw, &err);
     if (err.error != QJsonParseError::NoError || !doc.isObject()) {
         applyDefaults();
-        seedFromDesktop();
+        ensureDesktopFrame();
+        syncDesktopFrame();
         save();
         return true;
     }
@@ -209,6 +229,7 @@ bool AppConfig::load()
     m_theme = root.value("theme").toString("default");
     m_hotkey = root.value("hotkey").toString("ctrl+space");
     m_iconSize = qBound(24, root.value("iconSize").toInt(48), 128);
+    m_hideDesktopFrame = root.value("hideDesktopFrame").toBool(false);
 
     const QJsonObject canvas = root.value("canvas").toObject();
     m_canvas = QSize(qBound(480, canvas.value("width").toInt(720), 2400),
@@ -222,8 +243,14 @@ bool AppConfig::load()
             continue;
         if (it.name.isEmpty())
             it.name = it.isGroup() ? suggestGroupName() : displayNameFor(it.path);
+        if (it.isGroup() && it.color.isEmpty())
+            it.color = randomPaletteColor();
         m_items.append(it);
     }
+
+    ensureDesktopFrame();
+    syncDesktopFrame();
+    save();
 
     return true;
 }
@@ -239,6 +266,7 @@ bool AppConfig::save()
     root.insert("theme", m_theme);
     root.insert("hotkey", m_hotkey);
     root.insert("iconSize", m_iconSize);
+    root.insert("hideDesktopFrame", m_hideDesktopFrame);
 
     QJsonObject canvas;
     canvas.insert("width", m_canvas.width());
@@ -264,11 +292,67 @@ void AppConfig::applyDefaults()
     m_hotkey = "ctrl+space";
     m_iconSize = 48;
     m_canvas = QSize(720, 520);
+    m_hideDesktopFrame = false;
     m_items.clear();
 }
 
-void AppConfig::seedFromDesktop()
+void AppConfig::ensureDesktopFrame()
 {
+    for (const LayoutItem &it : m_items) {
+        if (it.isGroup() && it.system)
+            return;
+    }
+
+    LayoutItem frame;
+    frame.id = makeId();
+    frame.type = "group";
+    frame.name = QStringLiteral("桌面");
+    frame.system = true;
+    frame.color = defaultDesktopColor();
+    frame.cols = 4;
+    frame.rows = 4;
+    frame.x = 20;
+    frame.y = 20;
+
+    m_items.prepend(frame);
+
+    // 让已有分组避开桌面框，避免首次升级后两个框叠在一起
+    const int frameW = frame.cols * (Metrics::kGroupCellW + 2) + 2 * Metrics::kGroupPad;
+    const int frameH = frame.rows * (Metrics::kGroupCellH + 2) + 2 * Metrics::kGroupPad
+        + Metrics::kGroupTitleH;
+    const QRect frameRect(frame.x, frame.y, frameW, frameH);
+
+    for (LayoutItem &it : m_items) {
+        if (!it.isGroup() || it.system)
+            continue;
+        const int w = it.cols * (Metrics::kGroupCellW + 2) + 2 * Metrics::kGroupPad;
+        const int h = it.rows * (Metrics::kGroupCellH + 2) + 2 * Metrics::kGroupPad
+            + Metrics::kGroupTitleH;
+        const QRect r(it.x, it.y, w, h);
+        if (!r.intersects(frameRect))
+            continue;
+
+        int nx = frameRect.right() + 24;
+        if (nx + w > m_canvas.width() - 10)
+            nx = 20;
+        it.x = nx;
+        if (it.y < frameRect.bottom() + 16 && nx == 20)
+            it.y = frameRect.bottom() + 16;
+    }
+}
+
+void AppConfig::syncDesktopFrame()
+{
+    LayoutItem *frame = nullptr;
+    for (LayoutItem &it : m_items) {
+        if (it.isGroup() && it.system) {
+            frame = &it;
+            break;
+        }
+    }
+    if (!frame)
+        return;
+
     const QString desktop = QStandardPaths::writableLocation(QStandardPaths::DesktopLocation);
     if (desktop.isEmpty())
         return;
@@ -278,67 +362,39 @@ void AppConfig::seedFromDesktop()
         QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot,
         QDir::DirsFirst | QDir::Name | QDir::IgnoreCase);
 
-    QVector<QString> paths;
+    QStringList onDisk;
     for (const QFileInfo &fi : entries) {
         if (!isInteresting(fi))
             continue;
-        paths.append(QDir::fromNativeSeparators(fi.absoluteFilePath()));
-        if (paths.size() >= 24)
-            break;
+        onDisk.append(QDir::fromNativeSeparators(fi.absoluteFilePath()));
     }
 
-    if (paths.isEmpty())
-        return;
+    const QSet<QString> diskSet(onDisk.cbegin(), onDisk.cend());
 
-    // 首个分组：装前 9 项，让用户一打开就看到"框"的效果
-    LayoutItem group;
-    group.id = makeId();
-    group.type = "group";
-    group.name = QStringLiteral("文件夹1");
-    group.cols = 3;
-    group.rows = 3;
-    group.x = 20;
-    group.y = 20;
+    QVector<LayoutItem> kept;
+    kept.reserve(frame->children.size());
+    for (const LayoutItem &child : frame->children) {
+        if (diskSet.contains(child.path))
+            kept.append(child);
+    }
 
-    int consumed = 0;
-    for (const QString &p : paths) {
-        if (consumed >= 9)
-            break;
+    QSet<QString> keptPaths;
+    for (const LayoutItem &child : kept)
+        keptPaths.insert(child.path);
+
+    for (const QString &path : onDisk) {
+        if (keptPaths.contains(path))
+            continue;
         LayoutItem child;
         child.id = makeId();
         child.type = "app";
-        child.path = p;
-        child.name = displayNameFor(p);
-        group.children.append(child);
-        ++consumed;
-    }
-    m_items.append(group);
-
-    // 其余平铺在右侧
-    int col = 0;
-    int row = 0;
-    const int startX = 20 + 3 * 62 + 40;
-    for (int i = consumed; i < paths.size(); ++i) {
-        LayoutItem it;
-        it.id = makeId();
-        it.type = "app";
-        it.path = paths.at(i);
-        it.name = displayNameFor(paths.at(i));
-        it.x = startX + col * 68;
-        it.y = 24 + row * 76;
-        ++col;
-        if (it.x + 68 > m_canvas.width() - 20) {
-            ++row;
-            col = 0;
-            it.x = startX;
-            it.y = 24 + row * 76;
-        }
-        m_items.append(it);
+        child.path = path;
+        child.name = displayNameFor(path);
+        kept.append(child);
+        mirrorShortcut(frame->name, path);
     }
 
-    // 把分组里的快捷方式镜像到 groups/文件夹1/
-    for (const LayoutItem &c : group.children)
-        mirrorShortcut(group.name, c.path);
+    frame->children = kept;
 }
 
 LayoutItem *AppConfig::findById(const QString &id)
@@ -359,28 +415,27 @@ const LayoutItem *AppConfig::findById(const QString &id) const
     return const_cast<AppConfig *>(this)->findById(id);
 }
 
-LayoutItem *AppConfig::findParentOf(const QString &id)
+QString AppConfig::desktopFrameId() const
 {
-    for (LayoutItem &it : m_items) {
-        for (const LayoutItem &c : it.children) {
-            if (c.id == id)
-                return &it;
-        }
+    for (const LayoutItem &it : m_items) {
+        if (it.isGroup() && it.system)
+            return it.id;
     }
-    return nullptr;
+    return QString();
 }
 
 QString AppConfig::suggestGroupName() const
 {
-    int index = 1;
     QSet<QString> used;
     for (const LayoutItem &it : m_items) {
         if (it.isGroup())
-            used.insert(it.name);
+            used.insert(it.name.trimmed());
     }
-    while (used.contains(QStringLiteral("文件夹%1").arg(index)))
+
+    int index = 1;
+    while (used.contains(QStringLiteral("文件夹 %1").arg(index)))
         ++index;
-    return QStringLiteral("文件夹%1").arg(index);
+    return QStringLiteral("文件夹 %1").arg(index);
 }
 
 QString AppConfig::addApp(const QString &path, const QString &groupId)
@@ -410,9 +465,9 @@ QString AppConfig::addApp(const QString &path, const QString &groupId)
     }
 
     const int perRow = qMax(3, (m_canvas.width() - 40) / 68);
-    const int index = m_items.size();
-    item.x = 20 + (index % perRow) * 68;
-    item.y = 20 + ((index / perRow) % 5) * 76;
+    const int index = m_items.size() - 1;
+    item.x = 20 + (qMax(0, index) % perRow) * 68;
+    item.y = 20 + ((qMax(0, index) / perRow) % 5) * 76;
 
     m_items.append(item);
     save();
@@ -421,16 +476,17 @@ QString AppConfig::addApp(const QString &path, const QString &groupId)
     return item.id;
 }
 
-QString AppConfig::addGroup(const QString &name)
+QString AppConfig::addGroup(const QString &name, const QString &color)
 {
     LayoutItem group;
     group.id = makeId();
     group.type = "group";
     group.name = name.isEmpty() ? suggestGroupName() : name;
+    group.color = color.isEmpty() ? randomPaletteColor() : color;
     group.cols = 3;
     group.rows = 3;
-    group.x = 40 + (m_items.size() % 3) * 40;
-    group.y = 40 + (m_items.size() % 3) * 40;
+    group.x = 40 + (m_items.size() % 4) * 44;
+    group.y = 40 + (m_items.size() % 4) * 44;
 
     m_items.append(group);
     ensureGroupDir(group.name);
@@ -443,15 +499,18 @@ QString AppConfig::addGroup(const QString &name)
 void AppConfig::removeItem(const QString &id)
 {
     for (int i = 0; i < m_items.size(); ++i) {
-        if (m_items.at(i).id == id) {
-            if (m_items.at(i).isGroup())
-                removeGroupDir(m_items.at(i).name);
-            m_items.removeAt(i);
-            save();
-            emit layoutChanged();
-            emit changed();
-            return;
-        }
+        LayoutItem &it = m_items[i];
+        if (it.id != id)
+            continue;
+        if (it.system)
+            return; // 系统框不允许删除，只能隐藏
+        if (it.isGroup())
+            removeGroupDir(it.name);
+        m_items.removeAt(i);
+        save();
+        emit layoutChanged();
+        emit changed();
+        return;
     }
 
     for (LayoutItem &parent : m_items) {
@@ -470,7 +529,7 @@ void AppConfig::removeItem(const QString &id)
 bool AppConfig::renameGroup(const QString &id, const QString &newName)
 {
     LayoutItem *group = findById(id);
-    if (!group || !group->isGroup())
+    if (!group || !group->isGroup() || group->system)
         return false;
 
     const QString trimmed = newName.trimmed();
@@ -481,6 +540,21 @@ bool AppConfig::renameGroup(const QString &id, const QString &newName)
     renameGroupDir(oldName, trimmed);
     group->name = trimmed;
 
+    save();
+    emit layoutChanged();
+    emit changed();
+    return true;
+}
+
+bool AppConfig::setGroupColor(const QString &id, const QString &color)
+{
+    LayoutItem *group = findById(id);
+    if (!group || !group->isGroup() || group->system)
+        return false;
+    if (!color.startsWith('#'))
+        return false;
+
+    group->color = color;
     save();
     emit layoutChanged();
     emit changed();
@@ -513,27 +587,6 @@ bool AppConfig::setGroupGrid(const QString &id, int cols, int rows)
     emit layoutChanged();
     emit changed();
     return true;
-}
-
-bool AppConfig::detachFromGroup(const QString &id, const QPoint &pos)
-{
-    for (LayoutItem &parent : m_items) {
-        for (int j = 0; j < parent.children.size(); ++j) {
-            if (parent.children.at(j).id != id)
-                continue;
-
-            LayoutItem child = parent.children.takeAt(j);
-            child.x = qMax(0, pos.x());
-            child.y = qMax(0, pos.y());
-            m_items.append(child);
-
-            save();
-            emit layoutChanged();
-            emit changed();
-            return true;
-        }
-    }
-    return false;
 }
 
 void AppConfig::setLanguage(const QString &v)
@@ -570,6 +623,16 @@ void AppConfig::setIconSize(int v)
         return;
     m_iconSize = clamped;
     save();
+    emit changed();
+}
+
+void AppConfig::setHideDesktopFrame(bool v)
+{
+    if (m_hideDesktopFrame == v)
+        return;
+    m_hideDesktopFrame = v;
+    save();
+    emit layoutChanged();
     emit changed();
 }
 

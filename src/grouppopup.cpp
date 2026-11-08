@@ -2,6 +2,7 @@
 
 #include "iconprovider.h"
 #include "icontile.h"
+#include "i18n.h"
 #include "metrics.h"
 #include "theme.h"
 
@@ -36,7 +37,9 @@ void GroupPopup::buildTiles()
                               Metrics::kGroupPad + 3, Metrics::kGroupPad + 4);
     outer->setSpacing(2);
 
-    auto *title = new QLabel(m_group.name, this);
+    const QString titleText = m_group.system ? I18n::instance().t("group.desktop")
+                                            : m_group.name;
+    auto *title = new QLabel(titleText, this);
     QFont tf = title->font();
     tf.setPixelSize(12);
     tf.setBold(true);
