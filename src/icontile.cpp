@@ -130,11 +130,13 @@ void IconTile::mouseMoveEvent(QMouseEvent *event)
         QWidget::mouseMoveEvent(event);
         return;
     }
-    const QPoint delta = event->globalPosition().toPoint() - m_pressGlobal;
-    if (!m_moved && delta.manhattanLength() >= Metrics::kDragThreshold) {
-        m_moved = true;
-        emit dragRequested(m_pressGlobal);
+    const QPoint current = event->globalPosition().toPoint();
+    if (!m_moved && (current - m_pressGlobal).manhattanLength() < Metrics::kDragThreshold) {
+        event->accept();
+        return;
     }
+    m_moved = true;
+    emit dragMoved(m_pressGlobal, current);
     event->accept();
 }
 
@@ -149,7 +151,9 @@ void IconTile::mouseReleaseEvent(QMouseEvent *event)
     m_pressing = false;
     m_moved = false;
 
-    if (!moved)
+    if (moved)
+        emit dragEnded();
+    else
         emit clicked();
     event->accept();
 }

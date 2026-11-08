@@ -26,6 +26,8 @@ CanvasWidget::CanvasWidget(QWidget *parent)
 {
     setAcceptDrops(true);
     setAttribute(Qt::WA_TranslucentBackground, true);
+    // 每帧都会填满脏区，告诉 Qt 不必再做一次背景擦除
+    setAttribute(Qt::WA_OpaquePaintEvent, true);
     setContextMenuPolicy(Qt::DefaultContextMenu);
 
     connect(&AppConfig::instance(), &AppConfig::layoutChanged,
@@ -61,11 +63,10 @@ void CanvasWidget::clearWidgets()
 // 画布自己铺一层实心底色，否则子控件移动/删除后会留下半透明残影
 void CanvasWidget::paintEvent(QPaintEvent *event)
 {
-    Q_UNUSED(event)
     QPainter p(this);
     QColor bg = Theme::instance().color("window");
     bg.setAlpha(255);
-    p.fillRect(rect(), bg);
+    p.fillRect(event->rect(), bg);
 }
 
 void CanvasWidget::rebuildLayout()

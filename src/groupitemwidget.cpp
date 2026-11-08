@@ -67,8 +67,19 @@ void GroupItemWidget::rebuildTiles()
         connect(tile, &IconTile::clicked, this, [this, childId, childPath] {
             emit childLaunchRequested(m_item.id, childId, childPath);
         });
-        connect(tile, &IconTile::dragRequested, this, [this](const QPoint &globalPos) {
-            beginExternalDrag(globalPos);
+        connect(tile, &IconTile::dragMoved, this,
+                [this](const QPoint &start, const QPoint &current) {
+                    if (!m_externalDrag) {
+                        m_externalDrag = true;
+                        beginExternalDrag(start);
+                    }
+                    updateExternalDrag(current);
+                });
+        connect(tile, &IconTile::dragEnded, this, [this] {
+            if (!m_externalDrag)
+                return;
+            m_externalDrag = false;
+            emit dragFinished(m_item.id, pos());
         });
 
         tile->show();
@@ -81,8 +92,19 @@ void GroupItemWidget::rebuildTiles()
         connect(tile, &IconTile::clicked, this, [this] {
             emit openRequested(m_item.id);
         });
-        connect(tile, &IconTile::dragRequested, this, [this](const QPoint &globalPos) {
-            beginExternalDrag(globalPos);
+        connect(tile, &IconTile::dragMoved, this,
+                [this](const QPoint &start, const QPoint &current) {
+                    if (!m_externalDrag) {
+                        m_externalDrag = true;
+                        beginExternalDrag(start);
+                    }
+                    updateExternalDrag(current);
+                });
+        connect(tile, &IconTile::dragEnded, this, [this] {
+            if (!m_externalDrag)
+                return;
+            m_externalDrag = false;
+            emit dragFinished(m_item.id, pos());
         });
         tile->show();
         m_tiles.append(tile);

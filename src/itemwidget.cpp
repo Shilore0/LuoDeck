@@ -19,6 +19,26 @@ void ItemWidget::beginExternalDrag(const QPoint &globalPos)
     m_startPos = pos();
     m_pressing = true;
     m_dragging = true;
+    raise();
+}
+
+void ItemWidget::updateExternalDrag(const QPoint &globalPos)
+{
+    if (!m_pressing)
+        return;
+
+    QPoint target = m_startPos + (globalPos - m_pressGlobal);
+    QWidget *p = parentWidget();
+    if (p) {
+        target.setX(qBound(0, target.x(), qMax(0, p->width() - width())));
+        target.setY(qBound(0, target.y(), qMax(0, p->height() - height())));
+    }
+
+    // 只重绘旧位置与新位置的并集，避免整块画布每帧重画
+    const QRect before = geometry();
+    move(target);
+    if (p && before != geometry())
+        p->update(before.united(geometry()));
 }
 
 void ItemWidget::mousePressEvent(QMouseEvent *event)
@@ -31,6 +51,7 @@ void ItemWidget::mousePressEvent(QMouseEvent *event)
     m_startPos = pos();
     m_pressing = true;
     m_dragging = false;
+    raise(); // 只在这里抬升一次，拖动过程中不要再调
     event->accept();
 }
 
@@ -41,23 +62,14 @@ void ItemWidget::mouseMoveEvent(QMouseEvent *event)
         return;
     }
 
-    const QPoint delta = event->globalPosition().toPoint() - m_pressGlobal;
-    if (!m_dragging && delta.manhattanLength() < Metrics::kDragThreshold) {
+    const QPoint current = event->globalPosition().toPoint();
+    if (!m_dragging && (current - m_pressGlobal).manhattanLength() < Metrics::kDragThreshold) {
         event->accept();
         return;
     }
 
     m_dragging = true;
-
-    QPoint target = m_startPos + delta;
-    if (QWidget *p = parentWidget()) {
-        target.setX(qBound(0, target.x(), qMax(0, p->width() - width())));
-        target.setY(qBound(0, target.y(), qMax(0, p->height() - height())));
-    }
-    move(target);
-    raise();
-    if (QWidget *p = parentWidget())
-        p->update(); // 清掉旧位置留下的残影
+    updateExternalDrag(current);
     event->accept();
 }
 

@@ -19,7 +19,9 @@ public:
 
 signals:
     void clicked();
-    void dragRequested(const QPoint &globalPos);
+    // 拖动过程中持续上报：起点 + 当前点，由父级（框）负责移动自身
+    void dragMoved(const QPoint &startGlobal, const QPoint &currentGlobal);
+    void dragEnded();
 
 protected:
     void paintEvent(QPaintEvent *event) override;

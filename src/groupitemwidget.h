@@ -34,4 +34,5 @@ private:
     LayoutItem m_item;
     QString m_title;
     QVector<IconTile *> m_tiles;
+    bool m_externalDrag = false;
 };

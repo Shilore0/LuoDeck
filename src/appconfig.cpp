@@ -570,8 +570,9 @@ void AppConfig::moveItem(const QString &id, const QPoint &pos)
     item->x = qMax(0, pos.x());
     item->y = qMax(0, pos.y());
 
+    // 只落盘，不发 layoutChanged：位置变了但结构没变，
+    // 广播会让画布销毁重建所有控件，松手时肉眼可见地卡一下
     save();
-    emit layoutChanged();
 }
 
 bool AppConfig::setGroupGrid(const QString &id, int cols, int rows)

@@ -16,6 +16,7 @@ public:
 
     // 供分组内部子图标把手势交给分组本身
     void beginExternalDrag(const QPoint &globalPos);
+    void updateExternalDrag(const QPoint &globalPos);
 
 signals:
     void activated(const QString &id);
