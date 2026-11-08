@@ -1,27 +1,19 @@
 #include "mainwindow.h"
 
 #include "appconfig.h"
+#include "canvaswidget.h"
+#include "hotkey.h"
 #include "i18n.h"
 #include "iconprovider.h"
-#include "launcher.h"
+#include "settingsdialog.h"
 #include "theme.h"
-#include "tiledelegate.h"
-#include "tilemodel.h"
 
-#include <QAction>
 #include <QApplication>
 #include <QCursor>
 #include <QDesktopServices>
-#include <QDir>
-#include <QDragEnterEvent>
-#include <QDropEvent>
-#include <QFontMetrics>
 #include <QGuiApplication>
 #include <QKeyEvent>
-#include <QLabel>
-#include <QListView>
 #include <QMenu>
-#include <QMimeData>
 #include <QPainter>
 #include <QScreen>
 #include <QSystemTrayIcon>
@@ -35,96 +27,38 @@ MainWindow::MainWindow(QWidget *parent)
     setWindowFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint
                    | Qt::NoDropShadowWindowHint);
     setAttribute(Qt::WA_TranslucentBackground, true);
-    setAcceptDrops(true);
     setWindowTitle("LuoDeck");
 
-    buildUi();
-
-    connect(&AppConfig::instance(), &AppConfig::changed, this, &MainWindow::reload);
-    connect(&I18n::instance(), &I18n::languageChanged, this, &MainWindow::retranslateUi);
-    connect(&Theme::instance(), &Theme::themeChanged, this, &MainWindow::applyTheme);
-
-    applyTheme();
-    m_model->rebuild();
-    updateEmptyState();
-}
-
-MainWindow::~MainWindow() = default;
-
-void MainWindow::buildUi()
-{
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(14, 14, 14, 14);
     layout->setSpacing(0);
 
-    m_view = new QListView(this);
-    m_view->setObjectName("TileView");
-    m_view->setViewMode(QListView::IconMode);
-    m_view->setResizeMode(QListView::Adjust);
-    m_view->setMovement(QListView::Static);
-    m_view->setUniformItemSizes(true);
-    m_view->setSpacing(0);
-    m_view->setSelectionMode(QAbstractItemView::SingleSelection);
-    m_view->setTextElideMode(Qt::ElideRight);
-    m_view->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
-    m_view->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    m_view->setMouseTracking(true);
-    m_view->setContextMenuPolicy(Qt::CustomContextMenu);
-    m_view->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    m_view->setFrameShape(QFrame::NoFrame);
+    m_canvas = new CanvasWidget(this);
+    layout->addWidget(m_canvas);
 
-    m_model = new TileModel(this);
-    m_delegate = new TileDelegate(this);
-    m_view->setModel(m_model);
-    m_view->setItemDelegate(m_delegate);
+    connect(m_canvas, &CanvasWidget::requestHide, this, &MainWindow::hidePanel);
+    connect(&Theme::instance(), &Theme::themeChanged, this, &MainWindow::applyTheme);
+    connect(&I18n::instance(), &I18n::languageChanged, this, &MainWindow::retranslateUi);
 
-    layout->addWidget(m_view);
-
-    m_empty = new QLabel(m_view->viewport());
-    m_empty->setObjectName("EmptyHint");
-    m_empty->setAlignment(Qt::AlignCenter);
-    m_empty->setAttribute(Qt::WA_TransparentForMouseEvents, true);
-    m_empty->hide();
-
-    connect(m_view, &QListView::clicked, this, &MainWindow::onItemActivated);
-    connect(m_view, &QListView::customContextMenuRequested, this, &MainWindow::onContextMenu);
-
-    retranslateUi();
+    applyTheme();
+    m_canvas->rebuildLayout();
 }
 
-void MainWindow::retranslateUi()
-{
-    if (m_empty)
-        m_empty->setText(I18n::instance().t("ui.empty"));
-    rebuildTrayMenu();
-    updateEmptyState();
-}
+MainWindow::~MainWindow() = default;
 
-void MainWindow::applyStyle()
+void MainWindow::updateWindowSize()
 {
-    qApp->setStyleSheet(Theme::instance().styleSheet());
+    const QSize canvas = AppConfig::instance().canvasSize();
+    m_canvas->setFixedSize(canvas);
+    resize(canvas.width() + 28, canvas.height() + 28);
 }
 
 void MainWindow::applyTheme()
 {
-    applyStyle();
-
-    const int iconSize = AppConfig::instance().iconSize();
-    const int cols = qMax(3, AppConfig::instance().columns());
-    const QSize cell(iconSize + 40, iconSize + 46);
-
-    if (m_delegate)
-        m_delegate->setCellSize(cell);
-    if (m_view)
-        m_view->setGridSize(cell);
-
-    const int width = cols * cell.width() + 28 + 12;
-    const int height = qBound(320, cell.height() * 4 + 60, 640);
-    resize(width, height);
-
+    qApp->setStyleSheet(Theme::instance().styleSheet());
+    updateWindowSize();
     if (m_tray)
         m_tray->setIcon(makeTrayIcon());
-
     update();
 }
 
@@ -144,48 +78,32 @@ void MainWindow::paintEvent(QPaintEvent *event)
     p.drawRoundedRect(rect().adjusted(0, 0, -1, -1), th.radius(), th.radius());
 }
 
-void MainWindow::resizeEvent(QResizeEvent *event)
-{
-    QWidget::resizeEvent(event);
-    if (m_empty && m_view)
-        m_empty->setGeometry(m_view->viewport()->rect());
-}
-
-void MainWindow::positionNearCursor()
-{
-    QScreen *screen = QGuiApplication::screenAt(QCursor::pos());
-    if (!screen)
-        screen = QGuiApplication::primaryScreen();
-    if (!screen)
-        return;
-
-    const QRect avail = screen->availableGeometry();
-    const QPoint cursor = QCursor::pos();
-
-    int x = cursor.x() - width() / 2;
-    int y = cursor.y() - height() / 2;
-
-    x = qBound(avail.left() + 8, x, avail.right() - width() - 8);
-    y = qBound(avail.top() + 8, y, avail.bottom() - height() - 8);
-    move(x, y);
-}
-
 void MainWindow::showPanel()
 {
     m_allowAutoHide = false;
-    m_model->rebuild();
-    updateEmptyState();
-    positionNearCursor();
+    updateWindowSize();
+    m_canvas->rebuildLayout();
+
+    QScreen *screen = QGuiApplication::screenAt(QCursor::pos());
+    if (!screen)
+        screen = QGuiApplication::primaryScreen();
+    if (screen) {
+        const QRect avail = screen->availableGeometry();
+        const QPoint cursor = QCursor::pos();
+        int x = qBound(avail.left() + 8, cursor.x() - width() / 2, avail.right() - width() - 8);
+        int y = qBound(avail.top() + 8, cursor.y() - height() / 2, avail.bottom() - height() - 8);
+        move(x, y);
+    }
+
     show();
     raise();
     activateWindow();
-    m_view->setFocus();
+    setFocus();
     QTimer::singleShot(220, this, [this] { m_allowAutoHide = true; });
 }
 
 void MainWindow::hidePanel()
 {
-    m_model->setFolderCollapsedAll();
     hide();
 }
 
@@ -200,108 +118,21 @@ void MainWindow::toggleVisible()
 void MainWindow::reload()
 {
     IconProvider::instance().clear();
-    m_model->rebuild();
-    updateEmptyState();
+    m_canvas->rebuildLayout();
+    update();
 }
 
-void MainWindow::updateEmptyState()
+void MainWindow::retranslateUi()
 {
-    if (!m_empty || !m_model)
-        return;
-    const bool empty = m_model->rowCount() == 0;
-    m_empty->setVisible(empty);
-    if (empty && m_view)
-        m_empty->setGeometry(m_view->viewport()->rect());
-}
-
-void MainWindow::onItemActivated(const QModelIndex &index)
-{
-    const TileModel::Row *row = m_model->rowAt(index.row());
-    if (!row)
-        return;
-
-    if (row->entry.isFolder && !row->isChild) {
-        m_model->toggleFolderAt(index.row());
-        updateEmptyState();
-        return;
-    }
-
-    hidePanel();
-    Launcher::run(row->entry.path);
-}
-
-void MainWindow::onContextMenu(const QPoint &pos)
-{
-    const QModelIndex index = m_view->indexAt(pos);
-    QMenu menu(this);
-
-    if (index.isValid()) {
-        const TileModel::Row *row = m_model->rowAt(index.row());
-        if (row) {
-            if (!row->isChild) {
-                const QString id = row->entry.id;
-                menu.addAction(I18n::instance().t("ctx.remove"), this, [this, id] {
-                    AppConfig::instance().removeById(id);
-                });
-            }
-            const QString path = row->entry.path;
-            menu.addAction(I18n::instance().t("ctx.reveal"), this, [path] {
-                Launcher::revealInExplorer(path);
-            });
-            if (row->entry.isFolder) {
-                menu.addAction(I18n::instance().t("ctx.open_folder"), this, [path] {
-                    Launcher::openContainingFolder(path);
-                });
-            }
-            menu.addSeparator();
-        }
-    }
-
-    menu.addAction(I18n::instance().t("tray.reload"), this, &MainWindow::reload);
-    m_allowAutoHide = false;
-    menu.exec(m_view->viewport()->mapToGlobal(pos));
-    QTimer::singleShot(220, this, [this] { m_allowAutoHide = true; });
-}
-
-void MainWindow::dragEnterEvent(QDragEnterEvent *event)
-{
-    if (event->mimeData()->hasUrls())
-        event->acceptProposedAction();
-}
-
-void MainWindow::dragMoveEvent(QDragMoveEvent *event)
-{
-    if (event->mimeData()->hasUrls())
-        event->acceptProposedAction();
-}
-
-void MainWindow::dropEvent(QDropEvent *event)
-{
-    const QList<QUrl> urls = event->mimeData()->urls();
-    for (const QUrl &url : urls) {
-        if (!url.isLocalFile())
-            continue;
-        AppConfig::instance().addPath(url.toLocalFile());
-    }
-    event->acceptProposedAction();
-    showPanel();
+    rebuildTrayMenu();
+    update();
 }
 
 void MainWindow::keyPressEvent(QKeyEvent *event)
 {
-    switch (event->key()) {
-    case Qt::Key_Escape:
+    if (event->key() == Qt::Key_Escape) {
         hidePanel();
         return;
-    case Qt::Key_Return:
-    case Qt::Key_Enter: {
-        const QModelIndex idx = m_view->currentIndex();
-        if (idx.isValid())
-            onItemActivated(idx);
-        return;
-    }
-    default:
-        break;
     }
     QWidget::keyPressEvent(event);
 }
@@ -315,11 +146,54 @@ void MainWindow::closeEvent(QCloseEvent *event)
 bool MainWindow::event(QEvent *event)
 {
     if (event->type() == QEvent::WindowDeactivate && m_allowAutoHide && isVisible()) {
-        const bool menuOpen = (m_trayMenu && m_trayMenu->isVisible());
-        if (!menuOpen)
+        const bool menuOpen = m_trayMenu && m_trayMenu->isVisible();
+        if (!menuOpen && !m_canvas->isPopupOpen())
             hidePanel();
     }
     return QWidget::event(event);
+}
+
+void MainWindow::openSettings()
+{
+    m_allowAutoHide = false;
+
+    SettingsDialog dlg(this);
+    connect(&dlg, &SettingsDialog::hotkeyChanged, this, &MainWindow::reregisterHotkey);
+    dlg.exec();
+
+    m_allowAutoHide = true;
+}
+
+void MainWindow::setupHotkey()
+{
+    if (!m_hotkey) {
+        m_hotkey = new Hotkey(this);
+        connect(m_hotkey, &Hotkey::activated, this, &MainWindow::toggleVisible);
+    }
+    reregisterHotkey();
+}
+
+void MainWindow::reregisterHotkey()
+{
+    if (!m_hotkey)
+        return;
+
+    AppConfig &cfg = AppConfig::instance();
+    const QString wanted = cfg.hotkey();
+
+    if (m_hotkey->registerFromString(wanted))
+        return;
+
+    if (wanted.compare(QStringLiteral("ctrl+space"), Qt::CaseInsensitive) == 0
+        && m_hotkey->registerFromString(QStringLiteral("ctrl+alt+space"))) {
+        notify(QStringLiteral("LuoDeck"),
+               QStringLiteral("Ctrl+Space 已被其他程序（通常是输入法）占用，临时改用 Ctrl+Alt+Space。\n"
+                              "可在托盘 → 设置 中修改热键。"));
+        return;
+    }
+
+    notify(QStringLiteral("LuoDeck"),
+           I18n::instance().t(QStringLiteral("tray.hotkey_failed"), wanted));
 }
 
 QIcon MainWindow::makeTrayIcon() const
@@ -351,6 +225,8 @@ void MainWindow::rebuildTrayMenu()
 
     m_trayMenu->clear();
     m_trayMenu->addAction(I18n::instance().t("tray.show"), this, &MainWindow::toggleVisible);
+    m_trayMenu->addAction(I18n::instance().t("tray.settings"), this, &MainWindow::openSettings);
+    m_trayMenu->addSeparator();
     m_trayMenu->addAction(I18n::instance().t("tray.reload"), this, &MainWindow::reload);
     m_trayMenu->addAction(I18n::instance().t("tray.config_dir"), this, [] {
         QDesktopServices::openUrl(QUrl::fromLocalFile(AppConfig::instance().dataDir()));
@@ -383,5 +259,5 @@ void MainWindow::installTray()
 void MainWindow::notify(const QString &title, const QString &body)
 {
     if (m_tray)
-        m_tray->showMessage(title, body, QSystemTrayIcon::Information, 6000);
+        m_tray->showMessage(title, body, QSystemTrayIcon::Information, 7000);
 }

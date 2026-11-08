@@ -1,92 +1,84 @@
 # LuoDeck
 
-> 一个更快的 Windows 图标启动面板。文件夹原地展开、脚本可直接启动、桌面图标自动导入。
+> 一个更快的 Windows 图标启动面板。图标框内直接点击、框可拖动、容量可调、桌面图标自动导入。
 
-LuoDeck 是一个常驻托盘的启动器：按热键弹出图标网格，单击即启动。它针对 Windows 开始菜单的三处不便做了改进：
+LuoDeck 常驻托盘，按热键弹出自由布局的图标面板。相对 Windows 开始菜单的改进：
 
-- **文件夹不用点两次**：文件夹磁贴在面板内原地展开成小图标，不弹资源管理器、不抢焦点；
-- **不只认 exe**：`.bat` / `.cmd` / `.ps1` / `.py` / `.url` / `.lnk` / 文件夹 / 任意文档都能加，脚本启动时不会闪黑框；
-- **桌面自动导入**：首次运行自动扫描桌面并把快捷方式收进来，之后可随时拖入新项目。
-
-## 当前状态
-
-已完成第一版骨架，可编译可运行：
-
-- 托盘常驻 + 全局热键（默认 `Ctrl+Space`）
-- 图标网格（虚拟化，项数多也不卡）
-- 文件夹磁贴原地展开 / 收起
-- 拖入文件即添加，右键移除
-- 系统图标提取 + 内存缓存
-- 外置主题（JSON）与外置多语言（JSON），改文件即生效，无需改代码
-- 单实例保护（重复启动会唤出已有面板）
-- 高 DPI 适配（Per-Monitor V2）
-
-## 构建
-
-依赖：Qt 6.x（msvc2022_64）、Visual Studio Build Tools 2022（含 MSVC）、Windows 10/11。
-
-双击 `build.bat`，或命令行：
-
-```bat
-build.bat
-```
-
-脚本会载入 MSVC 环境、调用 `qmake` 生成 Makefile、`nmake` 编译，产物输出到 `bin\LuoDeck.exe`。
-
-若 Qt 装在别处，修改 `build.bat` 顶部的 `QTBIN`。
-
-首次运行后需要把 Qt 运行时 DLL 部署到 `bin`：
-
-```bat
-C:\Qt\6.11.2\msvc2022_64\bin\windeployqt.exe --release --no-translations --no-system-d3d-compiler --no-opengl-sw bin\LuoDeck.exe
-```
+- **文件夹不用点两次**：把若干快捷方式圈进一个"框"，框内图标缩小显示、**直接单击就能启动**，不需要先打开框；
+- **布局完全自由**：框和单个图标都能拖动，位置实时写盘；
+- **容量可控**：框可设 3×3、3×4、4×3 等容量，装不下时最后一格变成「打开」按钮，点开再选；
+- **不只认 exe**：`.bat` / `.cmd` / `.ps1` / `.py` / `.url` / `.lnk` / 文件夹都能加，脚本启动不闪黑框；
+- **桌面自动导入**：首次运行扫描桌面并收进来。
 
 ## 使用
 
-- 热键唤出面板（默认 `Ctrl+Space`）。**中文 Windows 上 `Ctrl+Space` 常被输入法占用**，若注册失败程序会自动降级为 `Ctrl+Alt+Space` 并弹托盘提示；
-- 单击图标启动；单击文件夹磁贴展开；
-- 右键磁贴：移除 / 打开所在位置 / 在资源管理器中打开；
-- 把文件或文件夹拖进面板即添加；
-- 托盘图标左键切换面板，右键有「重新加载 / 打开配置目录 / 退出」。
+| 操作 | 效果 |
+|---|---|
+| 热键（默认 `Ctrl+Space`） | 唤出 / 收起面板 |
+| 单击框内图标 | 直接启动 |
+| 单击框（图标以外的空白/边框区域） | 展开该框，显示名称与全部图标 |
+| 按住拖动 | 移动框或单个图标，松手即保存位置 |
+| 把文件拖到框上 | 加入该框，并在 `groups/<框名>/` 生成 .lnk |
+| 把文件拖到空白处 | 作为独立图标加入面板 |
+| 右键框 | 打开 / 重命名 / 显示容量 / 删除 |
+| 右键图标 | 打开所在位置 / 移除 |
+| 右键空白 | 新建文件夹框 / 刷新布局 |
+| 托盘图标右键 | 显示面板 / **设置**（主题、语言、热键）/ 重新加载 / 打开配置目录 / 退出 |
 
-## 配置：`luodeck.json`
+框在面板上默认不显示名称，只有展开时才在弹层里显示。新建的框按「文件夹1、文件夹2…」自动命名，可随时重命名。
 
-首次运行在 exe 同目录生成（若该目录不可写则放到 `%LOCALAPPDATA%\LuoDeck`）。
+## 数据位置
+
+全部数据在 **`%USERPROFILE%\Documents\LuoDeck`**：
+
+```
+Documents\LuoDeck\
+├── config.json           UI 布局（框与图标的位置、容量、名称）
+├── groups\
+│   └── 文件夹1\           每个框一个目录，里面是该框的快捷方式副本
+│       ├── 微信.lnk
+│       └── ...
+├── themes\               主题（改完重启或改配置即生效）
+│   ├── default.json
+│   └── dark.json
+└── i18n\                 多语言
+    ├── zh_CN.json
+    └── en_US.json
+```
+
+`config.json` 结构（v2）：
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "language": "zh_CN",
   "theme": "default",
   "hotkey": "ctrl+space",
-  "grid": {
-    "iconSize": 48,
-    "columns": 6
-  },
+  "iconSize": 48,
+  "canvas": { "width": 720, "height": 520 },
   "items": [
     {
       "id": "uuid",
-      "path": "C:/Users/you/Desktop/微信.lnk",
-      "name": "微信",
-      "isFolder": false
-    }
+      "type": "group",
+      "name": "文件夹1",
+      "x": 20, "y": 20,
+      "cols": 3, "rows": 3,
+      "children": [
+        { "id": "uuid", "type": "app", "name": "微信", "path": "C:/...", "x": 0, "y": 0 }
+      ]
+    },
+    { "id": "uuid", "type": "app", "name": "终端", "path": "C:/...", "x": 260, "y": 24 }
   ]
 }
 ```
 
-| 字段 | 说明 |
-|---|---|
-| `language` | 对应 `i18n/<code>.json` 的文件名，如 `zh_CN`、`en_US` |
-| `theme` | 对应 `themes/<name>.json` 的文件名，如 `default`、`dark` |
-| `hotkey` | 形如 `ctrl+space`、`ctrl+alt+d`、`win+f1`；修饰键支持 `ctrl` / `alt` / `shift` / `win` |
-| `grid.iconSize` | 图标基准像素，24–128 |
-| `grid.columns` | 网格列数，3–20 |
-
-改动后重启生效（托盘菜单「重新加载」只重读图标与项目，不重读热键）。
+- 顶层 `items` 里的 `x` / `y` 是画布坐标（像素），拖动后自动写回；
+- 框内 `children` 的坐标不参与布局（按 `cols` / `rows` 自动排列），保留字段是为了将来支持框内手动排序；
+- 容量 = `cols × rows`。子项数超过容量时，前 `容量-1` 个正常显示，最后一格显示「打开」。
 
 ## 自定义主题
 
-在 `themes/` 下新建任意 `.json`，把 `luodeck.json` 的 `theme` 改成它的文件名即可。内置 `default.json`（浅色）与 `dark.json`（深色）。
+`themes/` 下新建任意 `.json`，在托盘「设置」里选它即可。
 
 ```json
 {
@@ -105,41 +97,60 @@ C:\Qt\6.11.2\msvc2022_64\bin\windeployqt.exe --release --no-translations --no-sy
 }
 ```
 
-- 颜色支持 `#RRGGBB` 或 `#AARRGGBB`（带透明度，面板背景建议带 alpha）；
-- `window` 是面板底色，`accent` 用于文件夹展开态提示与托盘图标；
-- 尺寸（图标大小、列数）在 `luodeck.json` 里配，主题只管视觉。
+颜色支持 `#RRGGBB` 或 `#AARRGGBB`（带透明度）。`window` 是面板底色，`surface` 是框的底色，`accent` 同时用于展开按钮与托盘图标。
 
 ## 添加语言
 
-在 `i18n/` 下复制 `zh_CN.json` 改名（如 `ja_JP.json`），翻译其中的键值，然后改 `luodeck.json` 的 `language`。键名缺失时界面会直接显示键名本身，便于发现漏翻。
+复制 `i18n/zh_CN.json` 改名翻译，再在「设置 → 语言」里选它。缺键时界面会显示键名本身，便于发现漏翻。
+
+## 构建
+
+依赖：Qt 6.x（msvc2022_64）、Visual Studio Build Tools 2022（MSVC）、Windows 10/11。
+
+双击 `build.bat`（或命令行执行），产物在 `bin\LuoDeck.exe`。若 Qt 装在别处，改 `build.bat` 顶部的 `QTBIN`。
+
+首次编译后部署 Qt 运行时：
+
+```bat
+C:\Qt\6.11.2\msvc2022_64\bin\windeployqt.exe --release --no-translations --no-system-d3d-compiler --no-opengl-sw bin\LuoDeck.exe
+```
+
+> `dxcompiler.dll` + `dxil.dll` 共约 26MB，纯 Widgets 项目用不到，可以删。
+
+重新编译前需要先退出正在运行的程序，否则链接会报 `LNK1104`。
 
 ## 目录结构
 
 ```
 LuoDeck.pro              qmake 工程
-build.bat                一键构建脚本
+build.bat                一键构建
 src/
-  main.cpp               入口、单实例、热键注册与降级
-  mainwindow.*           面板窗口（无边框圆角、托盘、拖放、右键菜单）
-  tilemodel.*            磁贴数据模型（含文件夹展开逻辑）
-  tiledelegate.*         磁贴绘制（图标 + 文字 + 悬停态）
+  main.cpp               入口与单实例
+  mainwindow.*           面板容器、托盘、设置入口、自动隐藏
+  canvaswidget.*         自由布局画布：拖放、右键菜单、位置持久化
+  itemwidget.*           可拖动图标基类（短按=激活，拖动=移动）
+  appitemwidget.*        单图标绘制
+  groupitemwidget.*      框：网格排布、容量与溢出
+  grouppopup.*           展开的框（显示名称 + 全部图标）
+  icontile.*             框内小图标
+  settingsdialog.*       设置：主题 / 语言 / 热键
+  appconfig.*            配置读写、分组目录与快捷方式镜像
+  theme.*                主题 → QSS
+  i18n.*                 多语言
   iconprovider.*         系统图标提取与缓存
-  launcher.*             启动分发（exe/lnk/url/文件夹/脚本）
-  appconfig.*            配置读写、桌面导入
-  theme.*                主题加载与 QSS 生成
-  i18n.*                 多语言加载
+  launcher.*             启动分发
   hotkey.*               RegisterHotKey 全局热键
+  metrics.h              尺寸常量
 ```
 
 ## 路线图
 
-- [ ] 设置界面（热键、主题、语言改为界面内切换）
-- [ ] 图标磁盘缓存（跨重启复用，进一步降低启动耗时）
-- [ ] 分页 / 分组（多屏场景）
+- [ ] 图标磁盘缓存（跨重启复用）
+- [ ] 框内手动排序 / 拖出框外
+- [ ] 多面板分页
 - [ ] 搜索过滤
-- [ ] 拖拽排序、跨分组移动
 - [ ] 开机自启开关
-- [ ] 面板位置记忆（屏幕边缘吸附）
+- [ ] 框重叠时的层级控制
 
 ## 许可
 
