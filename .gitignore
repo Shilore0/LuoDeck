@@ -1,0 +1,66 @@
+# ---- 构建产物 ----
+/build/
+/build-*/
+/out/
+/dist/
+obj/
+bin/
+debug/
+release/
+
+# ---- CMake ----
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CMakeUserPresets.json
+CTestTestfile.cmake
+
+# ---- Qt 自动生成 ----
+moc_*.cpp
+moc_*.h
+qrc_*.cpp
+ui_*.h
+*.moc
+.qmake.stash
+*.qm
+.qrc.depends
+
+# ---- qmake / .pro ----
+Makefile
+Makefile.*
+*.pro.user
+*.pro.user.*
+
+# ---- 编译中间件 ----
+*.obj
+*.o
+*.pdb
+*.ilk
+*.exp
+*.lib
+*.res
+*.tlog
+*.log
+
+# ---- windeployqt 部署产物（运行时 DLL，不入库）----
+/platforms/
+/styles/
+/imageformats/
+/iconengines/
+/translations/
+/*.dll
+
+# ---- 运行时缓存（图标缓存、缩略图等）----
+/cache/
+
+# ---- IDE ----
+.vs/
+.vscode/
+.idea/
+CMakeLists.txt.user
+CMakeLists.txt.user.*
+
+# ---- 系统 ----
+Thumbs.db
+Desktop.ini
+.DS_Store
