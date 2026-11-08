@@ -15,6 +15,9 @@ public:
 signals:
     void hotkeyChanged();
 
+protected:
+    void showEvent(QShowEvent *event) override;
+
 private slots:
     void applyAndClose();
 

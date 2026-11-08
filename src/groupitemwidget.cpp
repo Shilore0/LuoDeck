@@ -31,6 +31,14 @@ void GroupItemWidget::setLayoutItem(const LayoutItem &item)
     m_title = item.system ? I18n::instance().t("group.desktop") : item.name;
 }
 
+void GroupItemWidget::setColor(const QString &color)
+{
+    if (m_item.color == color)
+        return;
+    m_item.color = color;
+    update();
+}
+
 void GroupItemWidget::relayoutTiles()
 {
     const int cols = qMax(1, m_item.cols);

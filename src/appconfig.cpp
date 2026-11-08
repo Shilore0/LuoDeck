@@ -556,7 +556,7 @@ bool AppConfig::setGroupColor(const QString &id, const QString &color)
 
     group->color = color;
     save();
-    emit layoutChanged();
+    emit itemVisualChanged(id);
     emit changed();
     return true;
 }

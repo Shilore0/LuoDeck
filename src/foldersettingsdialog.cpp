@@ -2,6 +2,7 @@
 
 #include "i18n.h"
 #include "theme.h"
+#include "windowfx.h"
 
 #include <QDialogButtonBox>
 #include <QFormLayout>
@@ -9,14 +10,17 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QShowEvent>
 #include <QVBoxLayout>
 
 FolderSettingsDialog::FolderSettingsDialog(const LayoutItem &item, QWidget *parent)
     : QDialog(parent)
     , m_item(item)
     , m_color(item.color.isEmpty() ? AppConfig::defaultDesktopColor() : item.color)
+    , m_originalColor(m_color)
 {
     setWindowTitle(I18n::instance().t("folder.settings"));
+    setWindowIcon(luoDeckIcon());
     setMinimumWidth(360);
     setModal(true);
 
@@ -49,12 +53,12 @@ FolderSettingsDialog::FolderSettingsDialog(const LayoutItem &item, QWidget *pare
         btn->setEnabled(!m_item.system);
         btn->setStyleSheet(
             QString("QPushButton { background: %1; border: 2px solid transparent;"
-                    " border-radius: 13px; }"
+                    " border-radius: 13px; padding: 0px; }"
                     "QPushButton:checked { border: 2px solid %2; }"
                     "QPushButton:disabled { border: 2px solid transparent; }")
                 .arg(c, textColor));
-        connect(btn, &QPushButton::clicked, this, [this, c] { selectColor(c); });
         btn->setProperty("colorValue", c);
+        connect(btn, &QPushButton::clicked, this, [this, c] { selectColor(c); });
         m_colorButtons.append(btn);
         colorsRow->addWidget(btn);
     }
@@ -79,15 +83,35 @@ FolderSettingsDialog::FolderSettingsDialog(const LayoutItem &item, QWidget *pare
     root->addWidget(buttons);
 }
 
+void FolderSettingsDialog::showEvent(QShowEvent *event)
+{
+    QDialog::showEvent(event);
+    applyFrameTheme(this);
+}
+
 void FolderSettingsDialog::selectColor(const QString &color)
 {
     if (m_item.system)
         return;
+
     m_color = color;
     for (QPushButton *btn : m_colorButtons) {
         btn->setChecked(btn->property("colorValue").toString().compare(color, Qt::CaseInsensitive)
                         == 0);
     }
+
+    // 实时预览：主面板立刻换色，不用点确定
+    emit colorPreviewed(color);
+}
+
+void FolderSettingsDialog::reject()
+{
+    // 取消时把预览过的颜色还原
+    if (!m_item.system && m_color.compare(m_originalColor, Qt::CaseInsensitive) != 0) {
+        m_color = m_originalColor;
+        emit colorPreviewed(m_originalColor);
+    }
+    QDialog::reject();
 }
 
 QString FolderSettingsDialog::folderName() const

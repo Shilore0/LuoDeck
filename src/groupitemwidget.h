@@ -15,6 +15,7 @@ public:
     explicit GroupItemWidget(const LayoutItem &item, QWidget *parent = nullptr);
 
     void setLayoutItem(const LayoutItem &item);
+    void setColor(const QString &color);
     const LayoutItem &layoutItem() const { return m_item; }
     QString groupName() const { return m_item.name; }
     QSize computeSize() const;

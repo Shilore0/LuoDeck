@@ -7,6 +7,7 @@
 #include "iconprovider.h"
 #include "settingsdialog.h"
 #include "theme.h"
+#include "windowfx.h"
 
 #include <QApplication>
 #include <QCursor>
@@ -58,7 +59,7 @@ void MainWindow::applyTheme()
     qApp->setStyleSheet(Theme::instance().styleSheet());
     updateWindowSize();
     if (m_tray)
-        m_tray->setIcon(makeTrayIcon());
+        m_tray->setIcon(luoDeckIcon());
     update();
 }
 
@@ -157,9 +158,13 @@ bool MainWindow::event(QEvent *event)
 
 void MainWindow::openSettings()
 {
+    if (!isVisible())
+        showPanel();
+
     m_allowAutoHide = false;
 
     SettingsDialog dlg(this);
+    placeBeside(&dlg, geometry());
     connect(&dlg, &SettingsDialog::hotkeyChanged, this, &MainWindow::reregisterHotkey);
     dlg.exec();
 
@@ -198,28 +203,6 @@ void MainWindow::reregisterHotkey()
            I18n::instance().t(QStringLiteral("tray.hotkey_failed"), wanted));
 }
 
-QIcon MainWindow::makeTrayIcon() const
-{
-    QPixmap pm(64, 64);
-    pm.fill(Qt::transparent);
-
-    QPainter p(&pm);
-    p.setRenderHint(QPainter::Antialiasing, true);
-    p.setPen(Qt::NoPen);
-    p.setBrush(Theme::instance().color("accent"));
-    p.drawRoundedRect(QRectF(5, 5, 54, 54), 15, 15);
-
-    p.setPen(Qt::white);
-    QFont f = p.font();
-    f.setPixelSize(34);
-    f.setBold(true);
-    p.setFont(f);
-    p.drawText(pm.rect(), Qt::AlignCenter, "L");
-    p.end();
-
-    return QIcon(pm);
-}
-
 void MainWindow::rebuildTrayMenu()
 {
     if (!m_trayMenu)
@@ -242,7 +225,7 @@ void MainWindow::installTray()
     if (m_tray)
         return;
 
-    m_tray = new QSystemTrayIcon(makeTrayIcon(), this);
+    m_tray = new QSystemTrayIcon(luoDeckIcon(), this);
     m_tray->setToolTip("LuoDeck");
 
     m_trayMenu = new QMenu(this);

@@ -4,6 +4,7 @@
 #include "i18n.h"
 #include "shellintegration.h"
 #include "theme.h"
+#include "windowfx.h"
 
 #include <QCheckBox>
 #include <QComboBox>
@@ -14,13 +15,21 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QShowEvent>
 #include <QUrl>
 #include <QVBoxLayout>
+
+void SettingsDialog::showEvent(QShowEvent *event)
+{
+    QDialog::showEvent(event);
+    applyFrameTheme(this);
+}
 
 SettingsDialog::SettingsDialog(QWidget *parent)
     : QDialog(parent)
 {
     setWindowTitle(I18n::instance().t("settings.title"));
+    setWindowIcon(luoDeckIcon());
     setMinimumWidth(380);
     setModal(true);
 

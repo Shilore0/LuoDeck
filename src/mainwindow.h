@@ -38,7 +38,6 @@ protected:
 private:
     void rebuildTrayMenu();
     void updateWindowSize();
-    QIcon makeTrayIcon() const;
 
     CanvasWidget *m_canvas = nullptr;
     QSystemTrayIcon *m_tray = nullptr;

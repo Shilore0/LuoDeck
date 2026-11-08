@@ -18,6 +18,7 @@ SOURCES += \
     src/settingsdialog.cpp \
     src/foldersettingsdialog.cpp \
     src/shellintegration.cpp \
+    src/windowfx.cpp \
     src/iconprovider.cpp \
     src/launcher.cpp \
     src/appconfig.cpp \
@@ -36,6 +37,7 @@ HEADERS += \
     src/settingsdialog.h \
     src/foldersettingsdialog.h \
     src/shellintegration.h \
+    src/windowfx.h \
     src/iconprovider.h \
     src/launcher.h \
     src/appconfig.h \
@@ -45,7 +47,7 @@ HEADERS += \
     src/metrics.h
 
 win32 {
-    LIBS += -luser32 -lshell32 -lole32
+    LIBS += -luser32 -lshell32 -lole32 -ldwmapi
 }
 
 CONFIG(release, debug|release) {

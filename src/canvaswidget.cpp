@@ -8,6 +8,7 @@
 #include "launcher.h"
 #include "metrics.h"
 #include "theme.h"
+#include "windowfx.h"
 
 #include <QContextMenuEvent>
 #include <QCursor>
@@ -32,6 +33,17 @@ CanvasWidget::CanvasWidget(QWidget *parent)
 
     connect(&AppConfig::instance(), &AppConfig::layoutChanged,
             this, &CanvasWidget::scheduleRebuild);
+
+    // 只改颜色时直接更新对应控件，不重建整块画布
+    connect(&AppConfig::instance(), &AppConfig::itemVisualChanged, this,
+            [this](const QString &id) {
+                GroupItemWidget *w = m_groupWidgets.value(id);
+                if (!w)
+                    return;
+                const LayoutItem *item = AppConfig::instance().findById(id);
+                if (item)
+                    w->setColor(item->color);
+            });
 }
 
 bool CanvasWidget::isPopupOpen() const
@@ -172,17 +184,23 @@ void CanvasWidget::showGroupMenu(const QString &id, const QPoint &globalPos)
             return;
 
         FolderSettingsDialog dlg(*target, this);
-        if (dlg.exec() != QDialog::Accepted)
-            return;
-        if (target->system)
-            return;
 
-        AppConfig &cfg = AppConfig::instance();
-        const QString newColor = dlg.folderColor();
-        const QString newName = dlg.folderName();
-        if (!newName.isEmpty())
-            cfg.renameGroup(id, newName);
-        cfg.setGroupColor(id, newColor);
+        // 颜色点一下就生效，主面板能立刻看到效果
+        connect(&dlg, &FolderSettingsDialog::colorPreviewed, this, [id](const QString &color) {
+            AppConfig::instance().setGroupColor(id, color);
+        });
+
+        // 摆到主面板旁边，别把面板挡住
+        if (QWidget *top = window())
+            placeBeside(&dlg, top->frameGeometry());
+
+        const int result = dlg.exec();
+
+        if (result == QDialog::Accepted && !target->system) {
+            const QString name = dlg.folderName();
+            if (!name.isEmpty())
+                AppConfig::instance().renameGroup(id, name);
+        }
     });
 
     QMenu *sizeMenu = menu.addMenu(I18n::instance().t("group.capacity"));

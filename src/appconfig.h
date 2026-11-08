@@ -82,6 +82,8 @@ public:
 signals:
     void changed();
     void layoutChanged();
+    // 只影响观感（如颜色）的改动，不需要重建整个画布
+    void itemVisualChanged(const QString &id);
 
 private:
     AppConfig() = default;

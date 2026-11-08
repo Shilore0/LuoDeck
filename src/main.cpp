@@ -6,6 +6,7 @@
 #include "i18n.h"
 #include "mainwindow.h"
 #include "theme.h"
+#include "windowfx.h"
 
 namespace {
 
@@ -99,6 +100,7 @@ int main(int argc, char *argv[])
     I18n::instance().load(cfg.language());
 
     app.setStyleSheet(Theme::instance().styleSheet());
+    app.setWindowIcon(luoDeckIcon());
 
     MainWindow window;
     window.installTray();
