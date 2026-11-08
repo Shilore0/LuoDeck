@@ -17,6 +17,7 @@ SOURCES += \
     src/icontile.cpp \
     src/settingsdialog.cpp \
     src/foldersettingsdialog.cpp \
+    src/shellintegration.cpp \
     src/iconprovider.cpp \
     src/launcher.cpp \
     src/appconfig.cpp \
@@ -34,6 +35,7 @@ HEADERS += \
     src/icontile.h \
     src/settingsdialog.h \
     src/foldersettingsdialog.h \
+    src/shellintegration.h \
     src/iconprovider.h \
     src/launcher.h \
     src/appconfig.h \

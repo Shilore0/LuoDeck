@@ -56,6 +56,8 @@ void ItemWidget::mouseMoveEvent(QMouseEvent *event)
     }
     move(target);
     raise();
+    if (QWidget *p = parentWidget())
+        p->update(); // 清掉旧位置留下的残影
     event->accept();
 }
 

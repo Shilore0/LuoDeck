@@ -105,11 +105,11 @@ void GroupItemWidget::paintEvent(QPaintEvent *event)
         accent = th.color("accent");
 
     QColor fill = accent;
-    fill.setAlpha(26);
+    fill.setAlpha(22);
 
-    p.setPen(QPen(accent, 1.4));
+    p.setPen(QPen(accent, 1.0));
     p.setBrush(fill);
-    p.drawRoundedRect(rect().adjusted(0, 0, -1, -1), Metrics::kGroupRadius,
+    p.drawRoundedRect(QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5), Metrics::kGroupRadius,
                       Metrics::kGroupRadius);
 
     // 顶部标题条：显示文件夹名字

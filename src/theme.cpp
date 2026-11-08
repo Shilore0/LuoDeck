@@ -155,12 +155,55 @@ QColor Theme::color(const QString &key) const
 
 QString Theme::styleSheet() const
 {
-    QString qss;
-    qss += QString("QWidget { color: %1; font-family: \"Microsoft YaHei UI\", \"Segoe UI\"; font-size: 13px; }")
-               .arg(m_text.name(QColor::HexRgb));
-    qss += "QListView#TileView { background: transparent; border: none; outline: none; }";
-    qss += "QListView#TileView::item { border: none; }";
+    const QString text = m_text.name(QColor::HexRgb);
+    const QString muted = m_textMuted.name(QColor::HexRgb);
+    const QString surface = m_surface.name(QColor::HexRgb);
+    const QString hover = m_surfaceHover.name(QColor::HexRgb);
+    const QString border = m_border.name(QColor::HexRgb);
+    const QString accent = m_accent.name(QColor::HexRgb);
 
+    QString qss;
+    qss += QString("QWidget { color: %1; font-family: \"Microsoft YaHei UI\", \"Segoe UI\";"
+                   " font-size: 13px; }")
+               .arg(text);
+
+    // 自绘控件不受样式表影响，避免出现半透明重影
+    qss += "MainWindow, CanvasWidget, GroupItemWidget, AppItemWidget, IconTile,"
+           " QListView#TileView { background: transparent; border: none; outline: none; }";
+    qss += "QLabel { background: transparent; }";
+
+    // 对话框：必须有明确底色，否则深色系统主题下会出现黑底黑字
+    qss += QString("QDialog { background-color: %1; }").arg(surface);
+    qss += QString("QDialog QLabel { color: %1; }").arg(text);
+
+    // 输入类控件
+    qss += QString("QLineEdit, QComboBox, QSpinBox { background: %1; color: %2;"
+                   " border: 1px solid %3; border-radius: 6px; padding: 5px 8px;"
+                   " min-height: 20px; selection-background-color: %4; }")
+               .arg(surface, text, border, accent);
+    qss += QString("QLineEdit:focus, QComboBox:focus { border: 1px solid %1; }").arg(accent);
+    qss += QString("QLineEdit:disabled, QComboBox:disabled { color: %1; background: %2; }")
+               .arg(muted, hover);
+    qss += QString("QComboBox QAbstractItemView { background: %1; color: %2;"
+                   " border: 1px solid %3; selection-background-color: %4; outline: none; }")
+               .arg(surface, text, border, accent);
+
+    // 按钮
+    qss += QString("QPushButton { background: %1; color: %2; border: none;"
+                   " border-radius: 6px; padding: 6px 16px; min-height: 20px; }")
+               .arg(hover, text);
+    qss += QString("QPushButton:hover { background: %1; }").arg(border);
+    qss += QString("QPushButton:pressed { background: %1; color: %2; }").arg(accent, surface);
+    qss += QString("QPushButton:disabled { color: %1; background: %2; }").arg(muted, hover);
+
+    // 复选框
+    qss += QString("QCheckBox { color: %1; spacing: 8px; }").arg(text);
+    qss += QString("QCheckBox::indicator { width: 16px; height: 16px; border: 1px solid %1;"
+                   " border-radius: 4px; background: %2; }")
+               .arg(border, surface);
+    qss += QString("QCheckBox::indicator:checked { background: %1; border-color: %1; }").arg(accent);
+
+    // 滚动条
     qss += QString("QScrollBar:vertical { background: transparent; width: 10px; margin: 2px; }"
                    "QScrollBar::handle:vertical { background: %1; border-radius: 3px; min-height: 28px; }"
                    "QScrollBar::handle:vertical:hover { background: %2; }"
@@ -169,14 +212,13 @@ QString Theme::styleSheet() const
                .arg(rgba(QColor(m_border.red(), m_border.green(), m_border.blue(), 160)),
                     rgba(QColor(m_textMuted.red(), m_textMuted.green(), m_textMuted.blue(), 170)));
 
+    // 菜单
     qss += QString("QMenu { background: %1; border: 1px solid %2; border-radius: 8px; padding: 5px; }")
-               .arg(m_surface.name(QColor::HexRgb), m_border.name(QColor::HexRgb));
-    qss += QString("QMenu::item { padding: 7px 26px 7px 14px; border-radius: 5px; color: %1; }")
-               .arg(m_text.name(QColor::HexRgb));
-    qss += QString("QMenu::item:selected { background: %1; }").arg(m_surfaceHover.name(QColor::HexRgb));
-    qss += QString("QMenu::separator { height: 1px; background: %1; margin: 5px 8px; }")
-               .arg(m_border.name(QColor::HexRgb));
+               .arg(surface, border);
+    qss += QString("QMenu::item { padding: 7px 26px 7px 14px; border-radius: 5px; color: %1; }").arg(text);
+    qss += QString("QMenu::item:selected { background: %1; }").arg(hover);
+    qss += QString("QMenu::item:disabled { color: %1; }").arg(muted);
+    qss += QString("QMenu::separator { height: 1px; background: %1; margin: 5px 8px; }").arg(border);
 
-    qss += QString("QLabel#EmptyHint { color: %1; }").arg(m_textMuted.name(QColor::HexRgb));
     return qss;
 }

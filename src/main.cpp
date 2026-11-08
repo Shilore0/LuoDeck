@@ -11,14 +11,19 @@ namespace {
 
 const char *kInstanceKey = "LuoDeck.SingleInstance.v1";
 
-bool signalExistingInstance()
+// 已有实例在跑：把请求转给它（show 或 add|路径），然后自己退出
+bool signalExistingInstance(const QString &addPath)
 {
     QLocalSocket socket;
     socket.connectToServer(QString::fromLatin1(kInstanceKey));
     if (!socket.waitForConnected(300))
         return false;
 
-    socket.write("show");
+    const QByteArray payload = addPath.isEmpty()
+        ? QByteArrayLiteral("show")
+        : QByteArrayLiteral("add|") + addPath.toUtf8();
+
+    socket.write(payload);
     socket.flush();
     socket.waitForBytesWritten(300);
     socket.disconnectFromServer();
@@ -34,8 +39,25 @@ void startInstanceServer(MainWindow *window)
 
     QObject::connect(server, &QLocalServer::newConnection, window, [server, window] {
         while (QLocalSocket *client = server->nextPendingConnection()) {
-            client->deleteLater();
-            window->showPanel();
+            auto *buffer = new QByteArray();
+
+            QObject::connect(client, &QLocalSocket::readyRead, client, [client, buffer] {
+                *buffer += client->readAll();
+            });
+
+            QObject::connect(client, &QLocalSocket::disconnected, window,
+                             [client, buffer, window] {
+                                 const QByteArray data = *buffer + client->readAll();
+                                 delete buffer;
+
+                                 if (data.startsWith("add|")) {
+                                     const QString path = QString::fromUtf8(data.mid(4)).trimmed();
+                                     if (!path.isEmpty())
+                                         AppConfig::instance().addApp(path);
+                                 }
+                                 window->showPanel();
+                                 client->deleteLater();
+                             });
         }
     });
 }
@@ -53,7 +75,18 @@ int main(int argc, char *argv[])
     app.setOrganizationName(QStringLiteral("LuoDeck"));
     app.setQuitOnLastWindowClosed(false);
 
-    if (signalExistingInstance())
+    // 资源管理器右键菜单会以 --add "<路径>" 调用本程序
+    QString addPath;
+    const QStringList args = app.arguments();
+    for (int i = 0; i < args.size(); ++i) {
+        if (args.at(i).compare(QStringLiteral("--add"), Qt::CaseInsensitive) == 0
+            && i + 1 < args.size()) {
+            addPath = args.at(i + 1);
+            break;
+        }
+    }
+
+    if (signalExistingInstance(addPath))
         return 0;
 
     AppConfig &cfg = AppConfig::instance();
@@ -71,6 +104,10 @@ int main(int argc, char *argv[])
     window.installTray();
     startInstanceServer(&window);
     window.setupHotkey();
+
+    if (!addPath.isEmpty())
+        cfg.addApp(addPath);
+
     window.showPanel();
 
     return app.exec();

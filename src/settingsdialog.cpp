@@ -2,6 +2,7 @@
 
 #include "appconfig.h"
 #include "i18n.h"
+#include "shellintegration.h"
 #include "theme.h"
 
 #include <QCheckBox>
@@ -59,13 +60,38 @@ SettingsDialog::SettingsDialog(QWidget *parent)
     root->addWidget(note);
 
     auto *row = new QHBoxLayout;
+    row->setSpacing(8);
     auto *openDir = new QPushButton(I18n::instance().t("settings.open_dir"), this);
     connect(openDir, &QPushButton::clicked, this, [] {
         QDesktopServices::openUrl(QUrl::fromLocalFile(AppConfig::instance().dataDir()));
     });
     row->addWidget(openDir);
+
+    auto *shellBtn = new QPushButton(this);
+    auto refreshShell = [shellBtn] {
+        shellBtn->setText(ShellIntegration::isInstalled()
+                              ? I18n::instance().t("settings.shell_remove")
+                              : I18n::instance().t("settings.shell_install"));
+    };
+    refreshShell();
+    connect(shellBtn, &QPushButton::clicked, this, [refreshShell] {
+        QString err;
+        if (ShellIntegration::isInstalled())
+            ShellIntegration::uninstall(&err);
+        else
+            ShellIntegration::install(&err);
+        refreshShell();
+    });
+    row->addWidget(shellBtn);
+
     row->addStretch(1);
     root->addLayout(row);
+
+    auto *shellNote = new QLabel(I18n::instance().t("settings.shell_note"), this);
+    shellNote->setWordWrap(true);
+    shellNote->setStyleSheet(QString("color: %1; font-size: 12px;")
+                                 .arg(Theme::instance().color("textMuted").name(QColor::HexRgb)));
+    root->addWidget(shellNote);
 
     auto *hideBox = new QVBoxLayout;
     hideBox->setContentsMargins(0, 2, 0, 0);

@@ -40,6 +40,9 @@ const char *kZhCN = R"JSON({
   "settings.hotkey": "全局热键",
   "settings.hotkey_note": "格式如 ctrl+space、ctrl+alt+d、win+f1。中文系统下 Ctrl+Space 常被输入法占用，注册失败会自动改用 Ctrl+Alt+Space。",
   "settings.open_dir": "打开配置目录",
+  "settings.shell_install": "添加到右键菜单",
+  "settings.shell_remove": "移除右键菜单",
+  "settings.shell_note": "在文件或文件夹上右键即可「添加到 LuoDeck」，会加到面板顶层而不是某个文件夹里。Win11 需要点「显示更多选项」才能看到。",
   "settings.hide_desktop": "隐藏「桌面」文件夹",
   "settings.hide_desktop_note": "勾选后，桌面上的图标不会出现在面板中；配置与快捷方式仍保留在 LuoDeck 目录里，取消勾选即可恢复。",
   "settings.ok": "确定",
@@ -76,6 +79,9 @@ const char *kEnUS = R"JSON({
   "settings.hotkey": "Global hotkey",
   "settings.hotkey_note": "Format: ctrl+space, ctrl+alt+d, win+f1. On Chinese systems Ctrl+Space is often taken by the IME; LuoDeck falls back to Ctrl+Alt+Space.",
   "settings.open_dir": "Open config folder",
+  "settings.shell_install": "Add to context menu",
+  "settings.shell_remove": "Remove from context menu",
+  "settings.shell_note": "Right-click any file or folder and pick \"Add to LuoDeck\"; it is added to the panel root, not into a folder. On Windows 11 it sits under \"Show more options\".",
   "settings.hide_desktop": "Hide the Desktop folder",
   "settings.hide_desktop_note": "When checked, desktop icons are not shown in the panel. Config and shortcuts stay in the LuoDeck folder; uncheck to restore.",
   "settings.ok": "OK",
@@ -90,16 +96,40 @@ I18n &I18n::instance()
     return i;
 }
 
-void I18n::writeIfMissing(const QString &fileName, const QByteArray &content)
+void I18n::writeIfMissing(const QString &fileName, const QByteArray &builtin)
 {
     const QString path = m_dir + "/" + fileName;
-    if (QFile::exists(path))
+    const QJsonObject builtinObj = QJsonDocument::fromJson(builtin).object();
+
+    if (!QFile::exists(path)) {
+        QFile f(path);
+        if (f.open(QIODevice::WriteOnly))
+            f.write(builtin);
         return;
-    QFile f(path);
-    if (!f.open(QIODevice::WriteOnly))
+    }
+
+    // 文件已存在：只补齐缺失的键，保留用户的翻译
+    QFile in(path);
+    if (!in.open(QIODevice::ReadOnly))
         return;
-    f.write(content);
-    f.close();
+    const QByteArray raw = in.readAll();
+    in.close();
+
+    QJsonObject existing = QJsonDocument::fromJson(raw).object();
+    bool changed = false;
+    for (auto it = builtinObj.constBegin(); it != builtinObj.constEnd(); ++it) {
+        if (!existing.contains(it.key())) {
+            existing.insert(it.key(), it.value());
+            changed = true;
+        }
+    }
+    if (!changed)
+        return;
+
+    QFile out(path);
+    if (!out.open(QIODevice::WriteOnly | QIODevice::Truncate))
+        return;
+    out.write(QJsonDocument(existing).toJson(QJsonDocument::Indented));
 }
 
 void I18n::ensureDefaults()

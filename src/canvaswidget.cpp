@@ -7,6 +7,7 @@
 #include "i18n.h"
 #include "launcher.h"
 #include "metrics.h"
+#include "theme.h"
 
 #include <QContextMenuEvent>
 #include <QCursor>
@@ -16,6 +17,7 @@
 #include <QLineEdit>
 #include <QMenu>
 #include <QMimeData>
+#include <QPainter>
 #include <QTimer>
 #include <QUrl>
 
@@ -54,6 +56,16 @@ void CanvasWidget::clearWidgets()
         w->deleteLater();
     }
     m_groupWidgets.clear();
+}
+
+// 画布自己铺一层实心底色，否则子控件移动/删除后会留下半透明残影
+void CanvasWidget::paintEvent(QPaintEvent *event)
+{
+    Q_UNUSED(event)
+    QPainter p(this);
+    QColor bg = Theme::instance().color("window");
+    bg.setAlpha(255);
+    p.fillRect(rect(), bg);
 }
 
 void CanvasWidget::rebuildLayout()
