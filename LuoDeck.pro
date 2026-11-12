@@ -4,6 +4,13 @@ CONFIG += c++17
 TEMPLATE = app
 TARGET = LuoDeck
 
+# 语义化版本，写进 exe 的产品元数据；界面显示的版本号在 src/version.h
+VERSION = 1.0.0
+QMAKE_TARGET_COMPANY = "LuoDeck"
+QMAKE_TARGET_PRODUCT = "LuoDeck"
+QMAKE_TARGET_DESCRIPTION = "Windows 图标启动面板"
+QMAKE_TARGET_COPYRIGHT = "MIT License"
+
 DEFINES += QT_DEPRECATED_WARNINGS
 
 SOURCES += \
@@ -31,6 +38,7 @@ SOURCES += \
     src/winappdialog.cpp
 
 HEADERS += \
+    src/version.h \
     src/mainwindow.h \
     src/canvaswidget.h \
     src/itemwidget.h \

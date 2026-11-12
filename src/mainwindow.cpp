@@ -8,6 +8,7 @@
 #include "settingsdialog.h"
 #include "shellselection.h"
 #include "theme.h"
+#include "version.h"
 #include "windowfx.h"
 
 #include <QApplication>
@@ -450,7 +451,7 @@ void MainWindow::installTray()
         return;
 
     m_tray = new QSystemTrayIcon(luoDeckIcon(), this);
-    m_tray->setToolTip("LuoDeck");
+    m_tray->setToolTip(QStringLiteral("LuoDeck v" LUODECK_VERSION));
 
     m_trayMenu = new QMenu(this);
     rebuildTrayMenu();

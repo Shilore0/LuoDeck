@@ -8,6 +8,7 @@
 #include "i18n.h"
 #include "mainwindow.h"
 #include "theme.h"
+#include "version.h"
 #include "windowfx.h"
 
 namespace {
@@ -84,7 +85,7 @@ int main(int argc, char *argv[])
 
     QApplication app(argc, argv);
     app.setApplicationName(QStringLiteral("LuoDeck"));
-    app.setApplicationDisplayName(QStringLiteral("LuoDeck"));
+    app.setApplicationDisplayName(QStringLiteral("LuoDeck v" LUODECK_VERSION));
     app.setOrganizationName(QStringLiteral("LuoDeck"));
     app.setQuitOnLastWindowClosed(false);
 

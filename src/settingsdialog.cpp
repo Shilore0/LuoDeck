@@ -4,6 +4,7 @@
 #include "i18n.h"
 #include "shellintegration.h"
 #include "theme.h"
+#include "version.h"
 #include "windowfx.h"
 
 #include <QCheckBox>
@@ -174,6 +175,16 @@ SettingsDialog::SettingsDialog(QWidget *parent)
     connect(buttons, &QDialogButtonBox::accepted, this, &SettingsDialog::applyAndClose);
     connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
     root->addWidget(buttons);
+
+    // 版本号放右下角，一眼能看到当前用的是哪一版
+    auto *version = new QLabel(QStringLiteral("LuoDeck v" LUODECK_VERSION), this);
+    QFont vf = version->font();
+    vf.setPixelSize(11);
+    version->setFont(vf);
+    version->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    version->setStyleSheet(QString("color: %1; background: transparent;")
+                               .arg(Theme::instance().color("textMuted").name(QColor::HexRgb)));
+    root->addWidget(version);
 }
 
 void SettingsDialog::applyAndClose()
