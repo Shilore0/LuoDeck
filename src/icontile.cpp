@@ -3,9 +3,12 @@
 #include "metrics.h"
 #include "theme.h"
 
+#include "iconprovider.h"
+
 #include <QContextMenuEvent>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QTimer>
 
 IconTile::IconTile(QWidget *parent)
     : QWidget(parent)
@@ -41,6 +44,14 @@ void IconTile::setOverflow(bool overflow, const QString &label)
     update();
 }
 
+void IconTile::setDropTarget(bool on)
+{
+    if (m_dropTarget == on)
+        return;
+    m_dropTarget = on;
+    update();
+}
+
 void IconTile::enterEvent(QEnterEvent *event)
 {
     m_hover = true;
@@ -65,12 +76,27 @@ void IconTile::paintEvent(QPaintEvent *event)
     const Theme &th = Theme::instance();
     const QRect cell = rect().adjusted(1, 1, -1, -1);
 
+    // 标签固定在底部，图标在剩余空间里居中；第一行格子矮 16px（让出标题条）也照样居中
+    constexpr int labelH = 15;
+    const int iconTop = qMax(2, (cell.height() - labelH - Metrics::kGroupIcon) / 2);
+
     if (m_hover) {
         QColor bg = th.color("surfaceHover");
         bg.setAlpha(200);
         p.setPen(Qt::NoPen);
         p.setBrush(bg);
-        p.drawRoundedRect(cell, 7, 7);
+        p.drawRoundedRect(cell, 4, 4);
+    }
+
+    // 重排时的落点提示
+    if (m_dropTarget) {
+        QColor accent = th.color("accent");
+        QPen pen(accent, 1.4, Qt::DashLine);
+        p.setPen(pen);
+        QColor fill = accent;
+        fill.setAlpha(30);
+        p.setBrush(fill);
+        p.drawRoundedRect(QRectF(cell).adjusted(1.5, 1.5, -1.5, -1.5), 7, 7);
     }
 
     if (m_overflow) {
@@ -81,7 +107,7 @@ void IconTile::paintEvent(QPaintEvent *event)
         QColor fill = accent;
         fill.setAlpha(24);
         p.setBrush(fill);
-        const QRect box(cell.center().x() - 14, cell.top() + Metrics::kGroupIconTop + 2, 28, 28);
+        const QRect box(cell.center().x() - 14, cell.top() + iconTop, 28, 28);
         p.drawRoundedRect(box, 7, 7);
 
         p.setPen(accent);
@@ -92,9 +118,7 @@ void IconTile::paintEvent(QPaintEvent *event)
         p.drawText(box, Qt::AlignCenter, QStringLiteral("+"));
     } else if (!m_icon.isNull()) {
         const int side = Metrics::kGroupIcon;
-        const QRect iconRect(cell.center().x() - side / 2,
-                             cell.top() + Metrics::kGroupIconTop,
-                             side, side);
+        const QRect iconRect(cell.center().x() - side / 2, cell.top() + iconTop, side, side);
         const qreal dpr = devicePixelRatioF();
         QPixmap pm = m_icon.pixmap(QSize(side, side) * dpr);
         if (!pm.isNull()) {
@@ -163,4 +187,14 @@ void IconTile::contextMenuEvent(QContextMenuEvent *event)
 {
     emit contextRequested(event->globalPos());
     event->accept();
+}
+
+void loadIconAsync(IconTile *tile, const QString &path, int delayMs)
+{
+    if (!tile)
+        return;
+    // 以 tile 作为 context object：弹层关掉时定时器自动作废，不会野指针
+    QTimer::singleShot(delayMs, tile, [tile, path] {
+        tile->setIcon(IconProvider::instance().icon(path));
+    });
 }

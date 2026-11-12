@@ -77,12 +77,13 @@ bool ShellIntegration::install(QString *error)
     const QString bgCommand = QStringLiteral("\"%1\" --add \"%2\"").arg(exe, QStringLiteral("%V"));
     writeVerb(backgroundKey(), bgCommand);
 
-    if (error) {
-        QSettings check(fileKey(), QSettings::NativeFormat);
-        if (!check.contains(QStringLiteral("command/."))) {
+    // 不管调用方要不要 error 都回读校验：写注册表失败却返回 true，
+    // 用户会以为右键菜单装好了
+    QSettings check(fileKey(), QSettings::NativeFormat);
+    if (!check.contains(QStringLiteral("command/."))) {
+        if (error)
             *error = QStringLiteral("写入注册表失败");
-            return false;
-        }
+        return false;
     }
     return true;
 }
@@ -94,4 +95,27 @@ bool ShellIntegration::uninstall(QString *error)
     removeVerb(dirKey());
     removeVerb(backgroundKey());
     return true;
+}
+
+QString ShellIntegration::runKey()
+{
+    return QStringLiteral("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run");
+}
+
+bool ShellIntegration::isAutoStartEnabled()
+{
+    QSettings s(runKey(), QSettings::NativeFormat);
+    return !s.value(QStringLiteral("LuoDeck")).toString().isEmpty();
+}
+
+bool ShellIntegration::setAutoStart(bool enabled)
+{
+    QSettings s(runKey(), QSettings::NativeFormat);
+    if (enabled)
+        s.setValue(QStringLiteral("LuoDeck"), QStringLiteral("\"%1\"").arg(exePath()));
+    else
+        s.remove(QStringLiteral("LuoDeck"));
+    s.sync();
+
+    return isAutoStartEnabled() == enabled;
 }

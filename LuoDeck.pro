@@ -25,7 +25,10 @@ SOURCES += \
     src/appconfig.cpp \
     src/theme.cpp \
     src/i18n.cpp \
-    src/hotkey.cpp
+    src/layoutengine.cpp \
+    src/hotkey.cpp \
+    src/winapps.cpp \
+    src/winappdialog.cpp
 
 HEADERS += \
     src/mainwindow.h \
@@ -45,11 +48,14 @@ HEADERS += \
     src/appconfig.h \
     src/theme.h \
     src/i18n.h \
+    src/layoutengine.h \
     src/hotkey.h \
-    src/metrics.h
+    src/metrics.h \
+    src/winapps.h \
+    src/winappdialog.h
 
 win32 {
-    LIBS += -luser32 -lshell32 -lole32 -loleaut32 -luuid -ldwmapi
+    LIBS += -luser32 -lshell32 -lole32 -loleaut32 -luuid -ldwmapi -lgdi32
 }
 
 CONFIG(release, debug|release) {

@@ -11,8 +11,13 @@ public:
     static bool uninstall(QString *error = nullptr);
     static QString exePath();
 
+    // 开机自启：写 HKCU\...\CurrentVersion\Run，无需管理员权限
+    static bool isAutoStartEnabled();
+    static bool setAutoStart(bool enabled);
+
 private:
     static QString fileKey();
     static QString dirKey();
     static QString backgroundKey();
+    static QString runKey();
 };

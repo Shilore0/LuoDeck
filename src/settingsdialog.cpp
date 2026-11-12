@@ -16,6 +16,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QShowEvent>
 #include <QUrl>
@@ -114,12 +115,14 @@ SettingsDialog::SettingsDialog(QWidget *parent)
                               : I18n::instance().t("settings.shell_install"));
     };
     refreshShell();
-    connect(shellBtn, &QPushButton::clicked, this, [refreshShell] {
+    connect(shellBtn, &QPushButton::clicked, this, [this, refreshShell] {
         QString err;
-        if (ShellIntegration::isInstalled())
-            ShellIntegration::uninstall(&err);
-        else
-            ShellIntegration::install(&err);
+        const bool ok = ShellIntegration::isInstalled()
+            ? ShellIntegration::uninstall(&err)
+            : ShellIntegration::install(&err);
+        // 注册表写入失败别静默吞掉，用户得知道右键菜单其实没装上
+        if (!ok && !err.isEmpty())
+            QMessageBox::warning(this, I18n::instance().t("settings.title"), err);
         refreshShell();
     });
     row->addWidget(shellBtn);
@@ -148,6 +151,22 @@ SettingsDialog::SettingsDialog(QWidget *parent)
     hideBox->addWidget(hideNote);
 
     root->addLayout(hideBox);
+
+    auto *bootBox = new QVBoxLayout;
+    bootBox->setContentsMargins(0, 2, 0, 0);
+    bootBox->setSpacing(2);
+
+    m_autoStart = new QCheckBox(I18n::instance().t("settings.autostart"), this);
+    m_autoStart->setChecked(ShellIntegration::isAutoStartEnabled());
+    bootBox->addWidget(m_autoStart);
+
+    auto *bootNote = new QLabel(I18n::instance().t("settings.autostart_note"), this);
+    bootNote->setWordWrap(true);
+    bootNote->setStyleSheet(QString("color: %1; font-size: 12px;")
+                                .arg(Theme::instance().color("textMuted").name(QColor::HexRgb)));
+    bootBox->addWidget(bootNote);
+
+    root->addLayout(bootBox);
 
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
     buttons->button(QDialogButtonBox::Ok)->setText(I18n::instance().t("settings.ok"));
@@ -198,6 +217,9 @@ void SettingsDialog::applyAndClose()
 
     if (m_hideDesktop && m_hideDesktop->isChecked() != cfg.hideDesktopFrame())
         cfg.setHideDesktopFrame(m_hideDesktop->isChecked());
+
+    if (m_autoStart)
+        ShellIntegration::setAutoStart(m_autoStart->isChecked());
 
     accept();
 }

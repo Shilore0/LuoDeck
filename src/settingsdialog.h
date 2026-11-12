@@ -28,4 +28,5 @@ private:
     QLineEdit *m_hotkeyAdd = nullptr;
     QLineEdit *m_python = nullptr;
     QCheckBox *m_hideDesktop = nullptr;
+    QCheckBox *m_autoStart = nullptr;
 };

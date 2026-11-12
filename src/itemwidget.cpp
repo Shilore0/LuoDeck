@@ -1,9 +1,12 @@
 #include "itemwidget.h"
 
 #include "metrics.h"
+#include "theme.h"
 
 #include <QContextMenuEvent>
 #include <QMouseEvent>
+#include <QPainter>
+#include <QTimer>
 
 ItemWidget::ItemWidget(const QString &itemId, QWidget *parent)
     : QWidget(parent)
@@ -11,6 +14,28 @@ ItemWidget::ItemWidget(const QString &itemId, QWidget *parent)
 {
     setCursor(Qt::PointingHandCursor);
     setAttribute(Qt::WA_TranslucentBackground, true);
+}
+
+void ItemWidget::flashHighlight()
+{
+    m_highlighted = true;
+    update();
+    QTimer::singleShot(900, this, [this] {
+        m_highlighted = false;
+        update();
+    });
+}
+
+void ItemWidget::paintHighlight(QPainter &p, int radius) const
+{
+    if (!m_highlighted)
+        return;
+
+    QColor glow = Theme::instance().color("accent");
+    glow.setAlpha(210);
+    p.setBrush(Qt::NoBrush);
+    p.setPen(QPen(glow, 2.0));
+    p.drawRoundedRect(QRectF(rect()).adjusted(1.5, 1.5, -1.5, -1.5), radius, radius);
 }
 
 void ItemWidget::beginExternalDrag(const QPoint &globalPos)

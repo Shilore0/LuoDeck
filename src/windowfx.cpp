@@ -56,11 +56,31 @@ void applyFrameTheme(QWidget *window)
 
 #ifdef Q_OS_WIN
     const HWND hwnd = reinterpret_cast<HWND>(window->winId());
-    const BOOL dark = Theme::instance().color("surface").lightness() < 128 ? TRUE : FALSE;
+    const Theme &th = Theme::instance();
+    const QColor surface = th.color("surface");
+    const QColor text = th.color("text");
+    const QColor border = th.color("border");
+    const BOOL dark = surface.lightness() < 128 ? TRUE : FALSE;
 
     // 20 = DWMWA_USE_IMMERSIVE_DARK_MODE（Win10 20H1+），19 为早期版本号
     if (FAILED(DwmSetWindowAttribute(hwnd, 20, &dark, sizeof(dark))))
         DwmSetWindowAttribute(hwnd, 19, &dark, sizeof(dark));
+
+    // Win11 22H2+ 可以直接给标题栏/边框上色，让它跟主题的 surface 一致，
+    // 不然系统只会给一个纯黑或纯白的标题栏（和面板放一起很跳）
+    const int kCaptionColor = 35; // DWMWA_CAPTION_COLOR
+    const int kTextColor = 36;    // DWMWA_TEXT_COLOR
+    const int kBorderColor = 34;  // DWMWA_BORDER_COLOR
+
+    auto toColorRef = [](const QColor &c) -> COLORREF {
+        return RGB(c.red(), c.green(), c.blue());
+    };
+    const COLORREF caption = toColorRef(surface);
+    const COLORREF title = toColorRef(text);
+    const COLORREF frame = toColorRef(border);
+    DwmSetWindowAttribute(hwnd, kCaptionColor, &caption, sizeof(caption));
+    DwmSetWindowAttribute(hwnd, kTextColor, &title, sizeof(title));
+    DwmSetWindowAttribute(hwnd, kBorderColor, &frame, sizeof(frame));
 #else
     Q_UNUSED(window)
 #endif

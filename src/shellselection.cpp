@@ -21,6 +21,30 @@
 namespace {
 
 #ifdef Q_OS_WIN
+
+// 与 winapps.cpp 里的同名类一致：按需初始化 COM，退出时只清理自己那一次。
+// 这里不能依赖 Qt 平台层"恰好"已经初始化过 OLE——热键触发路径上没人保证这一点。
+class ComScope
+{
+public:
+    ComScope()
+    {
+        const HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+        m_healthy = SUCCEEDED(hr) || hr == RPC_E_CHANGED_MODE;
+        m_uninit = SUCCEEDED(hr) && hr != S_FALSE;
+    }
+    ~ComScope()
+    {
+        if (m_uninit)
+            CoUninitialize();
+    }
+    bool healthy() const { return m_healthy; }
+
+private:
+    bool m_healthy = false;
+    bool m_uninit = false;
+};
+
 QStringList pathsFromDataObject(IDataObject *data)
 {
     QStringList out;
@@ -54,6 +78,10 @@ QStringList ShellSelection::currentSelection()
 {
     QStringList result;
 #ifdef Q_OS_WIN
+    ComScope com;
+    if (!com.healthy())
+        return result;
+
     IShellWindows *shellWindows = nullptr;
     if (FAILED(CoCreateInstance(CLSID_ShellWindows, nullptr, CLSCTX_ALL, IID_IShellWindows,
                                 reinterpret_cast<void **>(&shellWindows))))
@@ -63,7 +91,10 @@ QStringList ShellSelection::currentSelection()
     const HWND foregroundRoot = foreground ? GetAncestor(foreground, GA_ROOT) : nullptr;
 
     long count = 0;
-    shellWindows->get_Count(&count);
+    if (FAILED(shellWindows->get_Count(&count)) || count <= 0) {
+        shellWindows->Release();
+        return result;
+    }
 
     for (long i = 0; i < count && result.isEmpty(); ++i) {
         VARIANT v;

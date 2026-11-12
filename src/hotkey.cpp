@@ -116,12 +116,16 @@ Hotkey::~Hotkey()
     unregisterCurrent();
     if (qApp)
         qApp->removeNativeEventFilter(this);
+#ifdef Q_OS_WIN
+    delete m_host;
+    m_host = nullptr;
+#endif
 }
 
 void Hotkey::unregisterCurrent()
 {
 #ifdef Q_OS_WIN
-    if (!m_spec.isEmpty()) {
+    if (!m_spec.isEmpty() && m_host) {
         UnregisterHotKey(reinterpret_cast<HWND>(m_host->winId()), m_id);
         m_spec.clear();
     }
@@ -146,6 +150,20 @@ bool Hotkey::registerFromString(const QString &spec)
     quint32 mods = 0;
     if (parts.size() > 1)
         mods = parseModifiers(parts.mid(0, parts.size() - 1));
+
+    // 不带修饰键的"裸键"会把那个键从整个系统里吞掉（注册 "a" 之后
+    // 任何程序里都打不出 a），只放行本来就很少单按的 F1-F24。
+    const QString kl = parts.last().trimmed().toLower();
+    bool fnKey = false;
+    if (kl.size() >= 2 && kl.at(0) == QLatin1Char('f')) {
+        bool ok = false;
+        const int n = kl.mid(1).toInt(&ok);
+        fnKey = ok && n >= 1 && n <= 24;
+    }
+    if (mods == 0 && !fnKey) {
+        emit registrationFailed(spec);
+        return false;
+    }
 
     const auto hwnd = reinterpret_cast<HWND>(m_host->winId());
     if (!RegisterHotKey(hwnd, m_id, mods | MOD_NOREPEAT, vk)) {

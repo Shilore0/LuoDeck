@@ -51,11 +51,35 @@ QString rgba(const QColor &c)
 
 QColor parseColor(const QJsonObject &o, const QString &key, const QColor &fallback)
 {
-    const QString s = o.value(key).toString();
+    const QString s = o.value(key).toString().trimmed();
     if (s.isEmpty())
         return fallback;
+
+    // 主题文件里写的是 CSS 风格的 #RRGGBBAA（透明度在最后），
+    // 而 QColor 把 8 位十六进制当成 #AARRGGBB 解析 —— 直接丢给它，
+    // "#17181CF2" 会被读成「α=0x17 + 蓝色 #181CF2」，深色主题就变成一片蓝。
+    if (s.size() == 9 && s.startsWith(QLatin1Char('#'))) {
+        bool ok = false;
+        const uint v = s.mid(1).toUInt(&ok, 16);
+        if (ok) {
+            return QColor(int((v >> 24) & 0xff), int((v >> 16) & 0xff), int((v >> 8) & 0xff),
+                          int(v & 0xff));
+        }
+    }
+
     const QColor c(s);
     return c.isValid() ? c : fallback;
+}
+
+// 主题名只允许是 themes 目录下的文件名，挡住 config.json 手改 "../../xxx" 的可能
+bool isValidThemeName(const QString &name)
+{
+    if (name.isEmpty())
+        return false;
+    if (name.contains(QLatin1Char('/')) || name.contains(QLatin1Char('\\'))
+        || name.contains(QStringLiteral("..")))
+        return false;
+    return true;
 }
 
 } // namespace
@@ -110,10 +134,11 @@ bool Theme::readFile(const QString &path)
         return false;
 
     const QJsonObject root = doc.object();
-    m_radius = root.value("radius").toInt(m_radius);
-    m_spacing = root.value("spacing").toInt(m_spacing);
-    m_iconSize = root.value("iconSize").toInt(m_iconSize);
-    m_columns = root.value("columns").toInt(m_columns);
+    // 边界保护：主题文件可以随便写，别让 radius/spacing 变成 0 或负数把绘制搞坏
+    m_radius = qBound(0, root.value("radius").toInt(m_radius), 40);
+    m_spacing = qBound(0, root.value("spacing").toInt(m_spacing), 40);
+    m_iconSize = qBound(24, root.value("iconSize").toInt(m_iconSize), 128);
+    m_columns = qBound(1, root.value("columns").toInt(m_columns), 12);
 
     const QJsonObject c = root.value("colors").toObject();
     m_window = parseColor(c, "window", m_window);
@@ -131,6 +156,9 @@ void Theme::load(const QString &name)
     ensureDefaults();
 
     QString target = name.isEmpty() ? QStringLiteral("default") : name;
+    if (!isValidThemeName(target))
+        target = QStringLiteral("default");
+
     if (!readFile(m_dir + "/" + target + ".json")) {
         target = "default";
         if (!readFile(m_dir + "/default.json"))
@@ -177,11 +205,14 @@ QString Theme::styleSheet() const
     qss += QString("QDialog QLabel { color: %1; }").arg(text);
 
     // 输入类控件
-    qss += QString("QLineEdit, QComboBox, QSpinBox { background: %1; color: %2;"
+    qss += QString("QLineEdit, QComboBox, QSpinBox, QPlainTextEdit, QTextEdit"
+                   " { background: %1; color: %2;"
                    " border: 1px solid %3; border-radius: 6px; padding: 5px 8px;"
                    " min-height: 20px; selection-background-color: %4; }")
                .arg(surface, text, border, accent);
-    qss += QString("QLineEdit:focus, QComboBox:focus { border: 1px solid %1; }").arg(accent);
+    qss += QString("QLineEdit:focus, QComboBox:focus, QPlainTextEdit:focus, QTextEdit:focus"
+                   " { border: 1px solid %1; }")
+               .arg(accent);
     qss += QString("QLineEdit:disabled, QComboBox:disabled { color: %1; background: %2; }")
                .arg(muted, hover);
     qss += QString("QComboBox QAbstractItemView { background: %1; color: %2;"
@@ -211,6 +242,55 @@ QString Theme::styleSheet() const
                    "QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }")
                .arg(rgba(QColor(m_border.red(), m_border.green(), m_border.blue(), 160)),
                     rgba(QColor(m_textMuted.red(), m_textMuted.green(), m_textMuted.blue(), 170)));
+
+    // 列表 / 表格 / 树：这些控件默认走系统调色板，在深色主题下就是"黑字黑底"，
+    // 必须显式给底色和字色（之前选择应用、下拉列表都糊在这一条上）
+    qss += QString("QListWidget, QListView, QTreeView, QTableView, QTableWidget"
+                   " { background: %1; color: %2; border: 1px solid %3;"
+                   " border-radius: 8px; outline: none; alternate-background-color: %4; }")
+               .arg(surface, text, border, hover);
+    qss += QString("QListWidget::item, QListView::item, QTreeView::item, QTableView::item"
+                   " { color: %1; padding: 3px; border-radius: 6px; }")
+               .arg(text);
+    qss += QString("QListWidget::item:hover, QListView::item:hover, QTreeView::item:hover"
+                   " { background: %1; }")
+               .arg(hover);
+    qss += QString("QListWidget::item:selected, QListView::item:selected,"
+                   " QTreeView::item:selected, QTableView::item:selected"
+                   " { background: %1; color: %2; }")
+               .arg(accent, surface);
+    qss += QString("QHeaderView::section { background: %1; color: %2; border: none;"
+                   " border-bottom: 1px solid %3; padding: 5px 8px; }")
+               .arg(hover, text, border);
+
+    // 消息框 / 输入框这类"系统壳"也统一一下，免得白底黑字或者字看不清
+    qss += QString("QMessageBox, QInputDialog { background-color: %1; }").arg(surface);
+    qss += QString("QMessageBox QLabel, QInputDialog QLabel { color: %1; }").arg(text);
+
+    // 悬浮提示
+    qss += QString("QToolTip { background: %1; color: %2; border: 1px solid %3;"
+                   " border-radius: 6px; padding: 5px 8px; }")
+               .arg(hover, text, border);
+
+    // 分组框 / 单选 / 进度条
+    qss += QString("QGroupBox { color: %1; border: 1px solid %2; border-radius: 8px;"
+                   " margin-top: 10px; padding-top: 6px; }")
+               .arg(text, border);
+    qss += QString("QGroupBox::title { subcontrol-origin: margin; left: 10px;"
+                   " padding: 0 4px; color: %1; }")
+               .arg(muted);
+    qss += QString("QRadioButton { color: %1; spacing: 8px; }").arg(text);
+    qss += QString("QProgressBar { background: %1; color: %2; border: 1px solid %3;"
+                   " border-radius: 6px; text-align: center; min-height: 16px; }")
+               .arg(surface, text, border);
+    qss += QString("QProgressBar::chunk { background: %1; border-radius: 5px; }").arg(accent);
+
+    // 横向滚动条（和竖向一致）
+    qss += QString("QScrollBar:horizontal { background: transparent; height: 10px; margin: 2px; }"
+                   "QScrollBar::handle:horizontal { background: %1; border-radius: 3px; min-width: 28px; }"
+                   "QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; }"
+                   "QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal { background: transparent; }")
+               .arg(rgba(QColor(m_border.red(), m_border.green(), m_border.blue(), 160)));
 
     // 菜单
     qss += QString("QMenu { background: %1; border: 1px solid %2; border-radius: 8px; padding: 5px; }")

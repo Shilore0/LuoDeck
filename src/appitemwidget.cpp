@@ -61,4 +61,6 @@ void AppItemWidget::paintEvent(QPaintEvent *event)
     const QFontMetrics fm(f);
     p.drawText(textRect, Qt::AlignCenter,
                fm.elidedText(m_name, Qt::ElideRight, textRect.width()));
+
+    paintHighlight(p, 8);
 }
