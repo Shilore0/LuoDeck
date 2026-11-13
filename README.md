@@ -2,7 +2,7 @@
 
 > 一个更快的 Windows 图标启动面板。文件夹框内直接点击、框可拖动、名字与边框颜色可自定义、桌面图标自动收纳。
 
-**当前版本：v1.01** · [下载最新版](https://github.com/Shilore0/LuoDeck/releases/latest)（`LuoDeck-v1.01-win64.zip`，免安装，解压即用）
+**当前版本：v1.02** · [下载最新版](https://github.com/Shilore0/LuoDeck/releases/latest)（`LuoDeck-v1.02-win64.zip`，免安装，解压即用）
 
 LuoDeck 常驻托盘，按热键弹出自由布局的图标面板。相对 Windows 开始菜单的改进：
 
@@ -22,7 +22,7 @@ LuoDeck 常驻托盘，按热键弹出自由布局的图标面板。相对 Windo
 
 ## 下载与运行
 
-1. 到 [Releases](https://github.com/Shilore0/LuoDeck/releases) 下载 `LuoDeck-v1.01-win64.zip`（约 12MB，自带 Qt 运行库）；
+1. 到 [Releases](https://github.com/Shilore0/LuoDeck/releases) 下载 `LuoDeck-v1.02-win64.zip`（约 12MB，自带 Qt 运行库）；
 2. 解压到任意目录（**路径不要带中文**更稳妥），运行 `LuoDeck.exe`；
 3. 程序只在托盘驻留：点托盘图标或按热键 `Ctrl+Space` 唤出面板；
 4. 首次运行会问一次「要不要把开始菜单里已固定的程序也放进来？」。
@@ -277,6 +277,12 @@ src/
 - [ ] 文件夹之间互相拖拽合并
 
 ## 版本历史
+
+### v1.02（2026-11-13）
+
+- 修复 `Ctrl+Alt+L`（把资源管理器选中项加入面板）一直提示"没有检测到选中的文件"：Win11 资源管理器带标签页后 `IShellBrowser::GetWindow()` 给的是标签页子窗口，跟前台窗口句柄直接比永远不相等。改成两边都取 `GA_ROOT` 比较，多标签时按"拿到键盘焦点的那个标签页"取选中项，前台不是资源管理器时才退回唯一有选中项的窗口；
+- 修复通知横幅 / 任务管理器里应用名乱码：qmake 自动生成的版本信息资源按 ANSI 编译 UTF-8 中文，改为随源码提供 `LuoDeck.rc`（`#pragma code_page(65001)`）；
+- 启动不再弹面板：重复启动程序也不再弹出面板，只有全局热键和点托盘图标才唤出（资源管理器右键"添加到 LuoDeck"仍会亮一下面板做反馈）。
 
 ### v1.01（2026-11-13）
 

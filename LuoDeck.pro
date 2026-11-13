@@ -4,12 +4,16 @@ CONFIG += c++17
 TEMPLATE = app
 TARGET = LuoDeck
 
-# 语义化版本，写进 exe 的产品元数据；界面显示的版本号在 src/version.h（1.01 ↔ 1.0.1）
-VERSION = 1.0.1
+# 语义化版本，写进 exe 的产品元数据；界面显示的版本号在 src/version.h（1.02 ↔ 1.0.2）
+VERSION = 1.0.2
 QMAKE_TARGET_COMPANY = "LuoDeck"
 QMAKE_TARGET_PRODUCT = "LuoDeck"
 QMAKE_TARGET_DESCRIPTION = "Windows 图标启动面板"
 QMAKE_TARGET_COPYRIGHT = "MIT License"
+
+# 用自备的 .rc：qmake 自动生成的版本信息会把 UTF-8 中文按 GBK 编译，
+# 通知横幅里的应用名会变成乱码（详见 LuoDeck.rc 里的注释）
+RC_FILE = LuoDeck.rc
 
 DEFINES += QT_DEPRECATED_WARNINGS
 

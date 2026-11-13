@@ -64,12 +64,15 @@ void startInstanceServer(MainWindow *window)
                              [client, buffer, window] {
                                  const QByteArray data = *buffer + client->readAll();
 
+                                 // 只有「资源管理器右键 → 添加到 LuoDeck」才顺手把面板亮出来做反馈。
+                                 // 单纯再启动一次程序不再弹面板——面板只在热键 / 点托盘时出现。
                                  if (data.startsWith("add|")) {
                                      const QString path = QString::fromUtf8(data.mid(4)).trimmed();
-                                     if (!path.isEmpty())
+                                     if (!path.isEmpty()) {
                                          AppConfig::instance().addApp(path);
+                                         window->showPanel();
+                                     }
                                  }
-                                 window->showPanel();
                                  client->deleteLater();
                              });
         }
