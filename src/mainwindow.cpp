@@ -217,7 +217,40 @@ void MainWindow::showPanel()
     setFocus();
     m_canvas->rebuildLayout();
 
-    QTimer::singleShot(220, this, [this] { m_allowAutoHide = true; });
+    enableAutoHideSoon(220);
+}
+
+void MainWindow::enableAutoHideSoon(int delayMs)
+{
+    QTimer::singleShot(delayMs, this, [this] {
+        // 这期间可能又开了对话框（hold 计数不为 0），那就先别放开
+        if (m_panelHold == 0)
+            m_allowAutoHide = true;
+    });
+}
+
+void MainWindow::holdPanel()
+{
+    if (m_panelHold++ > 0)
+        return;
+
+    m_panelWasVisible = isVisible();
+    m_allowAutoHide = false;
+}
+
+void MainWindow::releasePanel()
+{
+    if (m_panelHold == 0)
+        return;
+    if (--m_panelHold > 0)
+        return;
+
+    // 有些对话框（尤其是系统的文件选择框）激活时，Windows 会把置顶工具窗藏起来，
+    // 用户关完对话框就以为面板没了。只要进来时是显示的，就无条件拉回来。
+    if (m_panelWasVisible && !isVisible())
+        showPanel();
+    else
+        enableAutoHideSoon(240);
 }
 
 void MainWindow::hidePanel()
@@ -286,11 +319,17 @@ void MainWindow::closeEvent(QCloseEvent *event)
 bool MainWindow::event(QEvent *event)
 {
     if (event->type() == QEvent::WindowDeactivate && m_allowAutoHide && isVisible()) {
+        // 正在开对话框（设置、文件夹设置、系统文件选择框…）：面板必须留着，
+        // 让用户在对话框旁边能看到效果。这条比下面靠 activeModalWidget()
+        // 判断更可靠——原生文件选择框不是 Qt 窗口，那边查不出来。
+        if (m_panelHold > 0)
+            return QWidget::event(event);
+
         const bool menuOpen = m_trayMenu && m_trayMenu->isVisible();
 
-        // 自己弹出的模态对话框（设置、选文件）不算失去焦点，否则一开框面板就没了
-        QWidget *modal = QApplication::activeModalWidget();
-        const bool modalOpen = modal && (modal == this || isAncestorOf(modal));
+        // 任何模态框（设置、选文件、重命名、确认框）打开时都不算"用户离开了面板"，
+        // 否则一开框面板就没了，看不到对话框里的改动效果
+        const bool modalOpen = QApplication::activeModalWidget() != nullptr;
 
         // 右键菜单 / 展开的框 也是独立弹窗，同样不能因此收起面板
         const bool popupOpen = QApplication::activePopupWidget() != nullptr;
@@ -306,14 +345,14 @@ void MainWindow::openSettings()
     if (!isVisible())
         showPanel();
 
-    m_allowAutoHide = false;
+    holdPanel();
 
     SettingsDialog dlg(this);
     placeBeside(&dlg, geometry());
     connect(&dlg, &SettingsDialog::hotkeyChanged, this, &MainWindow::reregisterHotkey);
     dlg.exec();
 
-    m_allowAutoHide = true;
+    releasePanel();
 }
 
 void MainWindow::setupHotkey()
@@ -439,7 +478,9 @@ void MainWindow::askFirstRunImport()
     box.setDefaultButton(yes);
     box.winId();
     applyFrameTheme(&box);
+    holdPanel();
     box.exec();
+    releasePanel();
 
     cfg.setShowStartMenu(box.clickedButton() == yes);
     cfg.markStartMenuAsked();

@@ -7,6 +7,7 @@
 #include "i18n.h"
 #include "launcher.h"
 #include "layoutengine.h"
+#include "mainwindow.h"
 
 #include "metrics.h"
 #include "theme.h"
@@ -47,6 +48,30 @@ QString pickStartDir()
     const QString desktop = QStandardPaths::writableLocation(QStandardPaths::DesktopLocation);
     return desktop.isEmpty() ? QDir::homePath() : desktop;
 }
+
+// 作用域内把主面板钉住：开对话框（含系统原生文件选择框）时，面板会因为失去
+// 激活而自动收起，用户一侧头就发现桌面面板没了。构造时 hold、析构时 release，
+// 任何 return 路径都能放开。
+class PanelHold
+{
+public:
+    explicit PanelHold(QWidget *anchor)
+    {
+        m_window = qobject_cast<MainWindow *>(anchor ? anchor->window() : nullptr);
+        if (m_window)
+            m_window->holdPanel();
+    }
+    ~PanelHold()
+    {
+        if (m_window)
+            m_window->releasePanel();
+    }
+    PanelHold(const PanelHold &) = delete;
+    PanelHold &operator=(const PanelHold &) = delete;
+
+private:
+    MainWindow *m_window = nullptr;
+};
 
 } // namespace
 
@@ -408,6 +433,9 @@ void CanvasWidget::showGroupMenu(const QString &id, const QPoint &globalPos)
 
         FolderSettingsDialog dlg(*target, this);
 
+        // 对话框开着的时候面板得留在原地：改颜色、改名字都能立刻在旁边看到效果
+        PanelHold hold(this);
+
         // 颜色点一下就生效，主面板能立刻看到效果
         connect(&dlg, &FolderSettingsDialog::colorPreviewed, this, [id](const QString &color) {
             AppConfig::instance().setGroupColor(id, color);
@@ -549,6 +577,10 @@ void CanvasWidget::showBlankMenu(const QPoint &globalPos)
 
 void CanvasWidget::addFilesTo(const QString &groupId)
 {
+    // 系统文件选择框是原生窗口，一弹出来主面板就会失去激活；
+    // 不钉住的话面板直接消失，用户选完文件才发现在别的窗口里
+    PanelHold hold(this);
+
     const QStringList files = QFileDialog::getOpenFileNames(
         this, I18n::instance().t("canvas.add_file"), pickStartDir(),
         I18n::instance().t("canvas.file_filter"));
@@ -565,6 +597,8 @@ void CanvasWidget::addFilesTo(const QString &groupId)
 
 void CanvasWidget::addFolderTo(const QString &groupId)
 {
+    PanelHold hold(this);
+
     const QString dir = QFileDialog::getExistingDirectory(
         this, I18n::instance().t("canvas.add_folder"), pickStartDir());
     if (dir.isEmpty())
@@ -578,6 +612,7 @@ void CanvasWidget::addFolderTo(const QString &groupId)
 void CanvasWidget::addWindowsAppsTo(const QString &groupId)
 {
     WinAppDialog dlg(this);
+    PanelHold hold(this);
     if (QWidget *top = window())
         placeBeside(&dlg, top->frameGeometry());
 
@@ -604,6 +639,7 @@ void CanvasWidget::renameItemDialog(const QString &id)
 
     // 自己搭 QInputDialog 而不是用静态 getText：这样按钮文字能跟着语言走（否则永远是 OK / Cancel）
     QInputDialog dlg(this);
+    PanelHold hold(this);
     dlg.setWindowTitle(QStringLiteral("%1 - %2").arg(I18n::instance().t("item.rename"), item->name));
     dlg.setLabelText(I18n::instance().t("item.rename_prompt"));
     dlg.setTextValue(item->name);
@@ -633,6 +669,7 @@ void CanvasWidget::editArgsDialog(const QString &id)
     const QColor muted = th.color("textMuted");
 
     QDialog dlg(this);
+    PanelHold hold(this);
     dlg.setWindowTitle(QStringLiteral("%1 - %2").arg(tr.t("item.args"), item->name));
     dlg.setMinimumWidth(480);
 

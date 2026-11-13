@@ -2,7 +2,7 @@
 
 > 一个更快的 Windows 图标启动面板。文件夹框内直接点击、框可拖动、名字与边框颜色可自定义、桌面图标自动收纳。
 
-**当前版本：v1.0** · [下载最新版](https://github.com/Shilore0/LuoDeck/releases/latest)（`LuoDeck-v1.0-win64.zip`，免安装，解压即用）
+**当前版本：v1.01** · [下载最新版](https://github.com/Shilore0/LuoDeck/releases/latest)（`LuoDeck-v1.01-win64.zip`，免安装，解压即用）
 
 LuoDeck 常驻托盘，按热键弹出自由布局的图标面板。相对 Windows 开始菜单的改进：
 
@@ -22,7 +22,7 @@ LuoDeck 常驻托盘，按热键弹出自由布局的图标面板。相对 Windo
 
 ## 下载与运行
 
-1. 到 [Releases](https://github.com/Shilore0/LuoDeck/releases) 下载 `LuoDeck-v1.0-win64.zip`（约 12MB，自带 Qt 运行库）；
+1. 到 [Releases](https://github.com/Shilore0/LuoDeck/releases) 下载 `LuoDeck-v1.01-win64.zip`（约 12MB，自带 Qt 运行库）；
 2. 解压到任意目录（**路径不要带中文**更稳妥），运行 `LuoDeck.exe`；
 3. 程序只在托盘驻留：点托盘图标或按热键 `Ctrl+Space` 唤出面板；
 4. 首次运行会问一次「要不要把开始菜单里已固定的程序也放进来？」。
@@ -277,6 +277,12 @@ src/
 - [ ] 文件夹之间互相拖拽合并
 
 ## 版本历史
+
+### v1.01（2026-11-13）
+
+- 开对话框时主面板不再自动消失：文件夹设置、添加文件、添加文件夹、重命名、参数设置、Windows 应用选择、设置对话框都会把面板留在原地，改颜色/改名能直接看到效果；
+- 原生文件选择框激活时，即使系统把置顶面板藏起来，关掉对话框后也会自动拉回；
+- 版本号 1.0 → 1.01。
 
 ### v1.0（2026-11-12）
 
