@@ -5,7 +5,7 @@ TEMPLATE = app
 TARGET = LuoDeck
 
 # 语义化版本，写进 exe 的产品元数据；界面显示的版本号在 src/version.h（1.02 ↔ 1.0.2）
-VERSION = 1.0.2
+VERSION = 1.0.3
 QMAKE_TARGET_COMPANY = "LuoDeck"
 QMAKE_TARGET_PRODUCT = "LuoDeck"
 QMAKE_TARGET_DESCRIPTION = "Windows 图标启动面板"

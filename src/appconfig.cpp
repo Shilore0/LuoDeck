@@ -1008,8 +1008,11 @@ QString AppConfig::suggestGroupName() const
     return QStringLiteral("文件夹 %1").arg(index);
 }
 
-QString AppConfig::addApp(const QString &path, const QString &groupId)
+QString AppConfig::addApp(const QString &path, const QString &groupId, bool *isNew)
 {
+    if (isNew)
+        *isNew = false;
+
     const QFileInfo fi(path);
     if (!fi.exists())
         return QString();
@@ -1060,6 +1063,8 @@ QString AppConfig::addApp(const QString &path, const QString &groupId)
     item.type = "app";
     item.path = normalized;
     item.name = displayNameFor(normalized);
+    if (isNew)
+        *isNew = true;
 
     if (group) {
         group->children.append(item);

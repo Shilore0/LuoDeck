@@ -23,6 +23,8 @@ public:
 
 signals:
     void childLaunchRequested(const QString &path, const QString &args);
+    // 右键菜单里的「以管理员身份运行」
+    void childAdminLaunchRequested(const QString &path, const QString &args);
     // 弹层里按 F5：交给画布整理整个面板
     void arrangeRequested();
 

@@ -97,6 +97,68 @@ QStringList selectionOf(IShellBrowser *browser, HWND *viewWnd = nullptr)
     return out;
 }
 
+// 前台窗口是不是桌面。桌面的宿主窗口有几个马甲：Progman（GetShellWindow 拿到的就是它）、
+// 播放动态壁纸/开了某些壁纸软件时的 WorkerW，最差情况下就是 GetDesktopWindow。
+bool isDesktopWindow(HWND hwnd)
+{
+    if (!hwnd)
+        return false;
+
+    const HWND root = GetAncestor(hwnd, GA_ROOT);
+    const HWND target = root ? root : hwnd;
+    if (target == GetShellWindow() || target == GetDesktopWindow())
+        return true;
+
+    wchar_t cls[64] = {0};
+    if (!GetClassNameW(target, cls, 64))
+        return false;
+    const QString className = QString::fromWCharArray(cls);
+    return className == QStringLiteral("Progman") || className == QStringLiteral("WorkerW");
+}
+
+// 桌面上的选区。Win11 的桌面**不在** IShellWindows 枚举结果里（实测枚举出来只有资源管理器
+// 标签页），所以只能拿 SWC_DESKTOP 这个专用入口单独问桌面浏览器。以前没这条路，
+// 桌面上选中图标再按热键永远只回一句"没有检测到选中的文件"。
+QStringList desktopSelection()
+{
+    QStringList out;
+
+    IShellWindows *shellWindows = nullptr;
+    if (FAILED(CoCreateInstance(CLSID_ShellWindows, nullptr, CLSCTX_ALL, IID_IShellWindows,
+                                reinterpret_cast<void **>(&shellWindows))))
+        return out;
+
+    // SWC_DESKTOP 不认定位值，两个 VARIANT 必须是 VT_EMPTY
+    VARIANT loc;
+    VARIANT locRoot;
+    VariantInit(&loc);
+    VariantInit(&locRoot);
+
+    long desktopHwnd = 0;
+    IDispatch *dispatch = nullptr;
+    if (SUCCEEDED(shellWindows->FindWindowSW(&loc, &locRoot, SWC_DESKTOP, &desktopHwnd,
+                                            SWFO_NEEDDISPATCH, &dispatch))
+        && dispatch) {
+        IServiceProvider *provider = nullptr;
+        if (SUCCEEDED(dispatch->QueryInterface(IID_IServiceProvider,
+                                               reinterpret_cast<void **>(&provider)))
+            && provider) {
+            IShellBrowser *browser = nullptr;
+            if (SUCCEEDED(provider->QueryService(SID_STopLevelBrowser, IID_IShellBrowser,
+                                                 reinterpret_cast<void **>(&browser)))
+                && browser) {
+                out = selectionOf(browser);
+                browser->Release();
+            }
+            provider->Release();
+        }
+        dispatch->Release();
+    }
+
+    shellWindows->Release();
+    return out;
+}
+
 // 两个窗口是不是"同一个资源管理器窗口"。Win11 22H2 之后资源管理器带标签页：
 // IShellBrowser::GetWindow() 给的是标签页子窗口（ShellTabWindowClass），
 // 前台拿到的却是外层框架窗口，直接比 HWND 永远不相等——两边都取 GA_ROOT 再比。
@@ -149,6 +211,12 @@ QStringList ShellSelection::currentSelection()
         return result;
 
     const HWND foreground = GetForegroundWindow();
+
+    // 桌面上选中的图标：桌面不在下面的枚举里，得单独问（详见 desktopSelection）。
+    // 前台是桌面时不再去看资源管理器窗口，否则会把别的窗口里的旧选中项加进来。
+    if (isDesktopWindow(foreground))
+        return desktopSelection();
+
     const HWND focusWnd = focusWindowOf(foreground);
 
     long count = 0;

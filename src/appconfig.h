@@ -92,7 +92,9 @@ public:
     // 找到某个 app 项所属的分组（顶层项返回 nullptr；out 指向该项本身）
     LayoutItem *parentGroupOf(const QString &childId);
 
-    QString addApp(const QString &path, const QString &groupId = QString());
+    // isNew 回来告诉调用方这次是真加进去了，还是本来就有（热键添加时要据此提示用户）
+    QString addApp(const QString &path, const QString &groupId = QString(),
+                   bool *isNew = nullptr);
     // 添加 Windows 商店应用（UWP）：path 存成 shell:AppsFolder\<aumid>，没有真实文件
     QString addShellApp(const QString &aumid, const QString &name,
                         const QString &groupId = QString());

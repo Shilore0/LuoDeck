@@ -3,15 +3,15 @@
 // （Windows 内部一直乱码显示成 "Windows 鍥炬爣鍚姩闈㈡澘"）。
 // 这里显式切到 UTF-8 代码页，StringFileInfo 也标成中文（0x0804）。
 // 改动 exe 元数据版本号时，这里的 FILEVERSION / FileVersion / ProductVersion
-// 要和 src/version.h 里的显示版本（1.02）保持一致。
+// 要和 src/version.h 里的显示版本（1.03）保持一致。
 
 #include <windows.h>
 
 #pragma code_page(65001)
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,0,2,0
- PRODUCTVERSION 1,0,2,0
+ FILEVERSION 1,0,3,0
+ PRODUCTVERSION 1,0,3,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS VS_FF_DEBUG
@@ -28,11 +28,11 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "LuoDeck\0"
             VALUE "FileDescription", "Windows 图标启动面板\0"
-            VALUE "FileVersion", "1.0.2.0\0"
+            VALUE "FileVersion", "1.0.3.0\0"
             VALUE "LegalCopyright", "MIT License\0"
             VALUE "OriginalFilename", "LuoDeck.exe\0"
             VALUE "ProductName", "LuoDeck\0"
-            VALUE "ProductVersion", "1.0.2.0\0"
+            VALUE "ProductVersion", "1.0.3.0\0"
         END
     END
     BLOCK "VarFileInfo"

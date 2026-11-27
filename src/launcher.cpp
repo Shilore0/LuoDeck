@@ -33,6 +33,27 @@ void hideConsoleWindow(QProcess::CreateProcessArguments *args)
     args->startupInfo->dwFlags |= STARTF_USESHOWWINDOW;
     args->startupInfo->wShowWindow = SW_HIDE;
 }
+
+// 走 ShellExecuteEx：行为跟资源管理器里双击一模一样。
+// verb 传 L"open" 就是正常打开；传 L"runas" 就是"以管理员身份运行"（会弹 UAC）。
+bool shellExecute(const QString &file, const QString &params, const QString &workDir,
+                  const wchar_t *verb, int showCmd)
+{
+    const QString nativeFile = QDir::toNativeSeparators(file);
+    const QString nativeDir = workDir.isEmpty() ? QString() : QDir::toNativeSeparators(workDir);
+
+    SHELLEXECUTEINFOW sei;
+    ZeroMemory(&sei, sizeof(sei));
+    sei.cbSize = sizeof(sei);
+    // 不加这个标志的话 ShellExecuteEx 可能异步返回，那时下面这些缓冲区已经没了
+    sei.fMask = SEE_MASK_NOASYNC;
+    sei.lpVerb = verb;
+    sei.lpFile = reinterpret_cast<LPCWSTR>(nativeFile.utf16());
+    sei.lpParameters = params.isEmpty() ? nullptr : reinterpret_cast<LPCWSTR>(params.utf16());
+    sei.lpDirectory = nativeDir.isEmpty() ? nullptr : reinterpret_cast<LPCWSTR>(nativeDir.utf16());
+    sei.nShow = showCmd;
+    return ShellExecuteExW(&sei) != FALSE;
+}
 #endif
 
 // bat/cmd/ps1 走的是 shell 命令行：换行符可以直接起新命令，
@@ -129,10 +150,8 @@ bool Launcher::run(const QString &path, const QString &args)
 
         const QString progSuffix = QFileInfo(program).suffix().toLower();
         if (progSuffix == "bat" || progSuffix == "cmd") {
-            return startWithArgs(QStringLiteral("cmd.exe"),
-                                 QStringLiteral("/c \"\"%1\" %2\"")
-                                     .arg(program, sanitizeArgsForShell(extra)),
-                                 dir);
+            // 参数原样丢给 shell，由它套 cmd /c ""脚本" 参数"
+            return shellExecute(program, sanitizeArgsForShell(extra), dir, L"open", SW_SHOWNORMAL);
         }
         if (progSuffix == "ps1") {
             return startWithArgs(QStringLiteral("powershell.exe"),
@@ -156,7 +175,11 @@ bool Launcher::run(const QString &path, const QString &args)
     }
 
     if (suffix == "bat" || suffix == "cmd") {
-        return startSilent("cmd.exe", {"/c", nativePath}, workDir);
+        // 以前是 cmd.exe /c + CREATE_NO_WINDOW + SW_HIDE：控制台窗口被藏起来了，
+        // 需要交互或看输出的脚本（比如 start_napcat.bat 要扫码登录、要一直挂着）就表现成
+        // "点了没反应"。交给 shell 打开，和双击 .bat 完全一致：控制台可见，
+        // 里面的 start / pause / 交互都正常。
+        return shellExecute(nativePath, QString(), workDir, L"open", SW_SHOWNORMAL);
     }
 
     if (suffix == "ps1") {
@@ -174,6 +197,63 @@ bool Launcher::run(const QString &path, const QString &args)
 
     // exe / lnk / url / 文件夹 / 其他文档：交给 Shell 打开，行为与资源管理器一致
     return QDesktopServices::openUrl(QUrl::fromLocalFile(fi.absoluteFilePath()));
+}
+
+bool Launcher::runAsAdmin(const QString &path, const QString &args)
+{
+#ifdef Q_OS_WIN
+    // 商店应用（UWP）没有可提权的进程，还是按 AUMID 激活；
+    // 调用方看到返回值就知道"这不是以管理员身份跑的"
+    if (WinApps::isShellAppPath(path))
+        return WinApps::activate(WinApps::aumidFromPath(path), args.trimmed());
+
+    const QFileInfo fi(path);
+    if (!fi.exists())
+        return false;
+
+    QString file = fi.absoluteFilePath();
+    QString dir = fi.absolutePath();
+    const QString params = sanitizeArgsForShell(args);
+
+    // .lnk 提权要提权它指向的那个程序，参数得我们自己接上去
+    if (fi.suffix().compare(QStringLiteral("lnk"), Qt::CaseInsensitive) == 0) {
+        const QString target = fi.symLinkTarget();
+        if (!target.isEmpty() && QFileInfo(target).exists()) {
+            file = target;
+            dir = QFileInfo(target).absolutePath();
+        }
+    }
+
+    const QString progSuffix = QFileInfo(file).suffix().toLower();
+
+    // 脚本类：真正要提权的是解释器，脚本路径当第一个参数
+    if (progSuffix == "ps1") {
+        const QString script = QStringLiteral("-NoProfile -ExecutionPolicy Bypass -File \"%1\"")
+                                   .arg(QDir::toNativeSeparators(file));
+        return shellExecute(QStringLiteral("powershell.exe"),
+                            params.isEmpty() ? script
+                                             : script + QLatin1Char(' ') + params,
+                            dir, L"runas", SW_SHOWNORMAL);
+    }
+    if (progSuffix == "py") {
+        const QString python = resolvePython();
+        if (python.isEmpty())
+            return false;
+        const QString script =
+            QStringLiteral("\"%1\"").arg(QDir::toNativeSeparators(file));
+        return shellExecute(python,
+                            params.isEmpty() ? script : script + QLatin1Char(' ') + params,
+                            dir, L"runas", SW_SHOWNORMAL);
+    }
+
+    // .bat / .cmd / .exe / .url / 文件夹 / 解出目标的 .lnk：
+    // 交给 shell 用 runas 动词提权，.bat 会被 cmd 接管，跟系统右键菜单里那条是同一个行为
+    return shellExecute(file, params, dir, L"runas", SW_SHOWNORMAL);
+#else
+    Q_UNUSED(path)
+    Q_UNUSED(args)
+    return false;
+#endif
 }
 
 void Launcher::revealInExplorer(const QString &path)

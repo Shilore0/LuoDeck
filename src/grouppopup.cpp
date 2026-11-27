@@ -3,9 +3,11 @@
 #include "iconprovider.h"
 #include "icontile.h"
 #include "i18n.h"
+#include "launcher.h"
 #include "metrics.h"
 #include "theme.h"
 
+#include <QApplication>
 #include <QEvent>
 #include <QCursor>
 #include <QFrame>
@@ -14,6 +16,7 @@
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMenu>
 #include <QPainter>
 #include <QScreen>
 #include <QScrollArea>
@@ -124,6 +127,44 @@ void GroupPopup::populate(const QString &filter)
             emit childLaunchRequested(path, childArgs);
             close();
         });
+
+        connect(tile, &IconTile::contextRequested, this,
+                [this, path, childArgs](const QPoint &globalPos) {
+                    // 弹 QMenu 会让本窗口失去激活，而这边默认"失活就关"，
+                    // 开菜单期间先自己把自动关闭按住
+                    const bool wasAllowed = m_allowAutoClose;
+                    m_allowAutoClose = false;
+
+                    // 动作先记下来，等 exec() 返回后再启动 / 关窗：
+                    // 在菜单的嵌套事件循环里 close()，弹层会在循环里被 deleteLater 掉，
+                    // 连同还在执行 exec 的菜单一起销毁，很容易炸
+                    int chosenAction = 0; // 0 = 什么都没选，1 = 打开，2 = 提权
+                    {
+                        QMenu menu(this);
+                        QAction *openAct = menu.addAction(I18n::instance().t("item.open"));
+                        QAction *adminAct =
+                            menu.addAction(I18n::instance().t("item.run_as_admin"));
+                        menu.addAction(I18n::instance().t("item.reveal"), this, [path] {
+                            Launcher::revealInExplorer(path);
+                        });
+
+                        QAction *picked = menu.exec(globalPos);
+                        if (picked == openAct)
+                            chosenAction = 1;
+                        else if (picked == adminAct)
+                            chosenAction = 2;
+                    }
+
+                    m_allowAutoClose = wasAllowed;
+
+                    if (chosenAction == 1) {
+                        emit childLaunchRequested(path, childArgs);
+                        close();
+                    } else if (chosenAction == 2) {
+                        emit childAdminLaunchRequested(path, childArgs);
+                        close();
+                    }
+                });
 
         // 弹层里也能整理顺序；只改显示顺序，不动磁盘上的文件
         {
@@ -298,6 +339,9 @@ void GroupPopup::keyPressEvent(QKeyEvent *event)
 bool GroupPopup::event(QEvent *event)
 {
     if (event->type() == QEvent::WindowDeactivate && m_allowAutoClose) {
+        // 右键菜单 / 对话框开着时不算"用户离开了弹层"，否则菜单一弹出来弹层就没了
+        if (QApplication::activePopupWidget() || QApplication::activeModalWidget())
+            return QWidget::event(event);
         close();
         return true;
     }

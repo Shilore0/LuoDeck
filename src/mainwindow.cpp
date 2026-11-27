@@ -47,6 +47,11 @@ MainWindow::MainWindow(QWidget *parent)
                I18n::instance().t(QStringLiteral("launch.failed"),
                                   QFileInfo(path).fileName()));
     });
+    connect(m_canvas, &CanvasWidget::adminLaunchFailed, this, [this](const QString &path) {
+        notify(QStringLiteral("LuoDeck"),
+               I18n::instance().t(QStringLiteral("launch.admin_failed"),
+                                  QFileInfo(path).fileName()));
+    });
     connect(m_canvas, &CanvasWidget::scrollRequested, this, &MainWindow::scrollBy);
     connect(m_canvas, &CanvasWidget::hScrollRequested, this, &MainWindow::scrollXBy);
     connect(m_canvas, &CanvasWidget::requestReveal, this, &MainWindow::revealCanvasRect);
@@ -423,19 +428,47 @@ void MainWindow::addCurrentSelection()
         return;
     }
 
-    QString last;
+    AppConfig &cfg = AppConfig::instance();
+    QString lastTop;    // 落在面板空白处的图标：画布上有对应控件，直接闪它
+    QString lastGroup;  // 落进某个框里：闪那个框（框里的子项没有独立控件）
+    bool groupHidden = false;
+    int added = 0;
+
     for (const QString &path : paths) {
-        const QString id = AppConfig::instance().addApp(path);
-        if (!id.isEmpty())
-            last = id;
+        bool isNew = false;
+        const QString id = cfg.addApp(path, QString(), &isNew);
+        if (id.isEmpty())
+            continue;
+        if (isNew)
+            ++added;
+
+        // 桌面上的东西会被收进「桌面」框，返回的是子项 id。
+        // 以前直接拿子项 id 去 flashItem，画布上找不到控件 → 加成功了却一点反馈都没有。
+        const LayoutItem *group = cfg.parentGroupOf(id);
+        if (group) {
+            lastGroup = group->id;
+            if (cfg.isHiddenItem(*group))
+                groupHidden = true;
+        } else {
+            lastTop = id;
+        }
     }
 
-    const int added = paths.size();
-    notify(QStringLiteral("LuoDeck"), I18n::instance().t(QStringLiteral("hotkey.added")).arg(added));
+    const I18n &tr = I18n::instance();
+    if (added == 0) {
+        notify(QStringLiteral("LuoDeck"), tr.t(QStringLiteral("hotkey.already")));
+    } else if (groupHidden) {
+        notify(QStringLiteral("LuoDeck"), tr.t(QStringLiteral("hotkey.desktop_hidden")));
+    } else {
+        notify(QStringLiteral("LuoDeck"), tr.t(QStringLiteral("hotkey.added")).arg(added));
+    }
+
     if (!isVisible())
         showPanel();
-    if (!last.isEmpty())
-        m_canvas->flashItem(last);
+    if (!lastGroup.isEmpty())
+        m_canvas->flashItem(lastGroup);
+    else if (!lastTop.isEmpty())
+        m_canvas->flashItem(lastTop);
 }
 
 void MainWindow::rebuildTrayMenu()

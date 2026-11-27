@@ -284,6 +284,12 @@ void CanvasWidget::addGroupWidget(const LayoutItem &item)
                     if (!Launcher::run(path, args))
                         emit launchFailed(path);
                 });
+                menu.addAction(I18n::instance().t("item.run_as_admin"), this,
+                               [this, path, args] {
+                                   emit requestHide();
+                                   if (!Launcher::runAsAdmin(path, args))
+                                       emit adminLaunchFailed(path);
+                               });
                 menu.addAction(I18n::instance().t("item.reveal"), this, [path] {
                     Launcher::revealInExplorer(path);
                 });
@@ -531,6 +537,11 @@ void CanvasWidget::showAppMenu(const QString &id, const QPoint &globalPos)
         if (!Launcher::run(path, args))
             emit launchFailed(path);
     });
+    menu.addAction(I18n::instance().t("item.run_as_admin"), this, [this, path, args] {
+        emit requestHide();
+        if (!Launcher::runAsAdmin(path, args))
+            emit adminLaunchFailed(path);
+    });
     menu.addAction(I18n::instance().t("item.reveal"), this, [path] {
         Launcher::revealInExplorer(path);
     });
@@ -770,6 +781,12 @@ void CanvasWidget::openGroupPopup(const QString &id, const QPoint &globalPos)
                 emit requestHide();
                 if (!Launcher::run(path, args))
                     emit launchFailed(path);
+            });
+    connect(popup, &GroupPopup::childAdminLaunchRequested, this,
+            [this](const QString &path, const QString &args) {
+                emit requestHide();
+                if (!Launcher::runAsAdmin(path, args))
+                    emit adminLaunchFailed(path);
             });
     connect(popup, &GroupPopup::arrangeRequested, this, [] {
         AppConfig::instance().autoArrange();

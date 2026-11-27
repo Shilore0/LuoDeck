@@ -28,6 +28,8 @@ public:
 signals:
     void requestHide();
     void launchFailed(const QString &path);
+    // 提权失败（UAC 点了「否」、商店应用不支持提权…），提示语和普通启动失败不一样
+    void adminLaunchFailed(const QString &path);
     // 内容比面板高/宽时，把滚轮手势交给主窗口处理（Shift+滚轮走横向）
     void scrollRequested(int delta);
     void hScrollRequested(int delta);
